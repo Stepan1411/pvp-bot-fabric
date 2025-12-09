@@ -1,4 +1,5 @@
-#PVP Bot
+
+![MIEDTMBMBRBOG](https://cdn.modrinth.com/data/cached_images/47af968dac4bcb1e69d6ef5bfd50c13d36725f21.png)
 
 A mod for Minecraft Fabric that adds smart PvP bots based on the Carpet mod.
 
