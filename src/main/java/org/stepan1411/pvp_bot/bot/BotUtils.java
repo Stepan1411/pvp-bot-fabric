@@ -127,7 +127,7 @@ public class BotUtils {
             
             // ПРИНУДИТЕЛЬНО держим слот с едой
             if (state.eatingSlot >= 0 && state.eatingSlot < 9) {
-                bot.getInventory().setSelectedSlot(state.eatingSlot);
+                ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) bot.getInventory()).setSelectedSlot(state.eatingSlot);
             }
             
             // Держим ПКМ нажатым напрямую (не через Carpet - это не сбрасывает прогресс)
@@ -183,7 +183,7 @@ public class BotUtils {
                     state.eatingSlot = foodSlot;
                     
                     // Переключаем слот напрямую
-                    inventory.setSelectedSlot(foodSlot);
+                    ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(foodSlot);
                     
                     // Начинаем есть напрямую
                     bot.setCurrentHand(Hand.MAIN_HAND);
@@ -356,7 +356,7 @@ public class BotUtils {
             slot = 0;
         }
         
-        inventory.setSelectedSlot(slot);
+        ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(slot);
         
         // Смотрим вниз
         bot.setPitch(90);
@@ -394,9 +394,9 @@ public class BotUtils {
             ItemStack current = inventory.getStack(0);
             inventory.setStack(axeSlot, current);
             inventory.setStack(0, axe);
-            inventory.setSelectedSlot(0);
+            ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(0);
         } else {
-            inventory.setSelectedSlot(axeSlot);
+            ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(axeSlot);
         }
         return true;
     }

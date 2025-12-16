@@ -379,7 +379,7 @@ public class BotCombat {
         // Экипируем меч/топор
         int weaponSlot = findMeleeWeapon(inventory);
         if (weaponSlot >= 0 && weaponSlot < 9) {
-            inventory.setSelectedSlot(weaponSlot);
+            ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(weaponSlot);
         }
         
         // Прекращаем натягивать лук если натягивали
@@ -425,7 +425,7 @@ public class BotCombat {
         // Экипируем лук
         int bowSlot = findRangedWeapon(inventory);
         if (bowSlot >= 0 && bowSlot < 9) {
-            inventory.setSelectedSlot(bowSlot);
+            ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(bowSlot);
         }
         
         // Проверяем есть ли стрелы
@@ -519,7 +519,7 @@ public class BotCombat {
         if (!bot.isOnGround()) {
             int maceSlot = findMace(inventory);
             if (maceSlot >= 0 && maceSlot < 9) {
-                inventory.setSelectedSlot(maceSlot);
+                ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(maceSlot);
             }
             
             // Атакуем при падении - раньше для максимального урона
@@ -546,7 +546,7 @@ public class BotCombat {
                 // Нет wind charge - обычный прыжок с булавой
                 int maceSlot = findMace(inventory);
                 if (maceSlot >= 0 && maceSlot < 9) {
-                    inventory.setSelectedSlot(maceSlot);
+                    ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(maceSlot);
                 }
                 
                 bot.jump();
@@ -565,7 +565,7 @@ public class BotCombat {
         if (bot.isOnGround() && distance <= 3.5 && state.attackCooldown <= 0) {
             int maceSlot = findMace(inventory);
             if (maceSlot >= 0 && maceSlot < 9) {
-                inventory.setSelectedSlot(maceSlot);
+                ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(maceSlot);
             }
             attackWithCarpet(bot, server);
             state.attackCooldown = settings.getAttackCooldown();

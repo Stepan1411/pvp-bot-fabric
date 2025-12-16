@@ -44,7 +44,6 @@ public class BotCommand {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
             CommandManager.literal("pvpbot")
-                .requires(source -> source.hasPermissionLevel(2))
                 
                 // /pvpbot spawn <name>
                 .then(CommandManager.literal("spawn")
