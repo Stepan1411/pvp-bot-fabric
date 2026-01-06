@@ -102,7 +102,10 @@ public class BotCombat {
         // Проверяем нужно ли отступать (низкое HP)
         float health = bot.getHealth();
         float maxHealth = bot.getMaxHealth();
-        boolean lowHealth = health <= maxHealth * 0.3f; // Меньше 30% HP
+        boolean lowHealth = health <= maxHealth * settings.getRetreatHealthPercent();
+        
+        // Проверяем есть ли еда для отступления
+        boolean hasFood = BotUtils.hasFood(bot);
         
         // Проверяем ест ли бот - НИКОГДА не переключаем слоты пока едим!
         var utilsState = BotUtils.getState(bot.getName().getString());
@@ -120,8 +123,17 @@ public class BotCombat {
             return;
         }
         
-        // Отступаем если низкое HP - убегаем пока HP не восстановится или враг не отстанет
-        if (lowHealth) {
+        // Пробуем использовать зелье исцеления если низкое HP
+        if (lowHealth && settings.isAutoPotionEnabled()) {
+            if (BotUtils.tryUseHealingPotion(bot, server)) {
+                // Используем зелье - не отступаем пока пьём
+                return;
+            }
+        }
+        
+        // Отступаем если низкое HP, включено отступление И есть еда
+        // Если еды нет - нет смысла отступать, лучше драться до конца
+        if (lowHealth && settings.isRetreatEnabled() && hasFood) {
             state.isRetreating = true;
             // Убегаем пока враг ближе 25 блоков (скорость 1.5 = максимальный бхоп)
             if (distance < 25.0) {
@@ -136,8 +148,10 @@ public class BotCombat {
         // Выбираем режим боя
         selectWeaponMode(bot, state, distance, settings);
         
-        // Поворачиваемся к цели
-        BotNavigation.lookAt(bot, target);
+        // Поворачиваемся к цели (если не бросаем зелье)
+        if (!utilsState.isThrowingPotion) {
+            BotNavigation.lookAt(bot, target);
+        }
         
         // Если враг слишком далеко для текущего режима - идём к нему
         double maxRange = switch (state.currentMode) {
@@ -605,8 +619,11 @@ public class BotCombat {
     /**
      * Бой копьём (Spear) - 1.21.11
      * Два режима атаки:
-     * - Charging: зажать ПКМ за 3-4 блока до цели, отпустить для мощной атаки
-     * - Jabbing: быстрый удар (обычная атака)
+     * - Удар с разбега (charge): держать ПКМ и врезаться в цель - урон наносится при столкновении
+     * - Укол (jab): обычная атака ЛКМ (требует 100% заряда между уколами)
+     * 
+     * ВАЖНО: Нельзя делать обычную атаку пока charge активен - это сбросит его!
+     * Удар с разбега наносит урон автоматически при столкновении с целью.
      */
     private static void handleSpearCombat(ServerPlayerEntity bot, Entity target, CombatState state, double distance, BotSettings settings, net.minecraft.server.MinecraftServer server) {
         var inventory = bot.getInventory();
@@ -622,54 +639,59 @@ public class BotCombat {
             ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(spearSlot);
         }
         
-        double spearRange = settings.getSpearRange();
-        double chargeStartDistance = 4.0; // Начинаем заряжать за 3-4 блока
+        double chargeStartDistance = 10.0; // Начинаем charge за 5 блоков
+        double chargeHitDistance = 0.1;   // Дистанция столкновения для charge (вплотную)
         
         // Логика боя копьём:
-        // - Далеко (> 4 блоков) - просто бежим к врагу БЕЗ заряда
-        // - За 3-4 блока - начинаем заряжать charge атаку
-        // - Близко (<= spearRange) - jab атака или отпускаем charge
+        // 1. Далеко (> 5 блоков) - бежим к врагу БЕЗ charge
+        // 2. За 5 блоков - начинаем charge (держим ПКМ) и бежим к врагу
+        // 3. При столкновении (< 1.5 блока) - урон наносится автоматически, отпускаем charge
+        // 4. После charge можно сразу делать jab, и наоборот
         
         if (distance > chargeStartDistance) {
-            // Далеко - просто бежим к врагу, НЕ заряжаем копьё
+            // Далеко - бежим к врагу БЕЗ charge
             if (state.isChargingSpear) {
                 bot.stopUsingItem();
                 state.isChargingSpear = false;
                 state.spearChargeTicks = 0;
             }
             BotNavigation.moveToward(bot, target, settings.getMoveSpeed());
-        } else if (distance > spearRange && distance <= chargeStartDistance) {
-            // За 3-4 блока - начинаем charge атаку
+            
+        } else if (distance > chargeHitDistance) {
+            // Средняя дистанция - charge атака (держим ПКМ и бежим)
             if (!state.isChargingSpear) {
+                // Начинаем charge - выставляем копьё вперёд
                 bot.setCurrentHand(Hand.MAIN_HAND);
                 state.isChargingSpear = true;
                 state.spearChargeTicks = 0;
-            } else {
-                state.spearChargeTicks++;
-                // Продолжаем бежать к врагу
-                BotNavigation.moveToward(bot, target, settings.getMoveSpeed() * 1.2);
             }
-        } else if (distance <= spearRange) {
-            // Близко к врагу
-            if (state.isChargingSpear) {
-                // Отпускаем charge атаку
+            
+            state.spearChargeTicks++;
+            
+            // Бежим к врагу с charge - урон нанесётся при столкновении
+            BotNavigation.moveToward(bot, target, settings.getMoveSpeed() * 1.3);
+            
+            // Проверяем стадии charge (усталость после ~40 тиков, разрядка после ~60)
+            if (state.spearChargeTicks > 60) {
+                // Стадия разрядки - лучше отпустить и начать заново
                 bot.stopUsingItem();
                 state.isChargingSpear = false;
                 state.spearChargeTicks = 0;
-                state.attackCooldown = 5; // Короткий кулдаун после charge
-            } else if (state.attackCooldown <= 0) {
-                // Jab атака (быстрый удар)
-                if (settings.isCriticalsEnabled() && bot.isOnGround()) {
-                    bot.jump();
-                }
-                attackWithCarpet(bot, target, server);
-                state.attackCooldown = 5; // Короткий кулдаун для jab
             }
             
-            // Держим дистанцию
-            if (distance < 2.0) {
-                BotNavigation.moveAway(bot, target, 0.3);
+        } else {
+            // Очень близко (столкновение) - урон от charge уже нанесён
+            if (state.isChargingSpear) {
+                // Отпускаем charge после столкновения
+                bot.stopUsingItem();
+                state.isChargingSpear = false;
+                state.spearChargeTicks = 0;
+                // После charge можно сразу делать jab
+                state.attackCooldown = 0;
             }
+            
+            // Отходим назад чтобы снова разбежаться для charge
+            BotNavigation.moveAway(bot, target, settings.getMoveSpeed());
         }
     }
 

@@ -46,8 +46,10 @@ public class BotManager {
         // Удаляем из списка в любом случае
         boolean wasInList = bots.remove(name);
         
-        // Очищаем состояние боя
+        // Очищаем все состояния бота
         BotCombat.removeState(name);
+        BotUtils.removeState(name);
+        BotNavigation.resetIdle(name);
 
         String command = "player " + name + " kill";
         var dispatcher = server.getCommandManager().getDispatcher();
@@ -67,8 +69,10 @@ public class BotManager {
     public static void removeAllBots(MinecraftServer server, ServerCommandSource source) {
         var dispatcher = server.getCommandManager().getDispatcher();
         for (String name : new HashSet<>(bots)) {
-            // Очищаем состояние боя
+            // Очищаем все состояния бота
             BotCombat.removeState(name);
+            BotUtils.removeState(name);
+            BotNavigation.resetIdle(name);
             
             String command = "player " + name + " kill";
             try {
@@ -97,6 +101,8 @@ public class BotManager {
             if (bot == null || !bot.isAlive()) {
                 bots.remove(name);
                 BotCombat.removeState(name);
+                BotUtils.removeState(name);
+                BotNavigation.resetIdle(name);
             }
         }
     }

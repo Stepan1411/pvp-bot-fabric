@@ -2,6 +2,7 @@ package org.stepan1411.pvp_bot.bot;
 
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.*;
 import net.minecraft.server.MinecraftServer;
@@ -23,6 +24,11 @@ public class BotUtils {
         public int eatingTicks = 0;
         public int windChargeCooldown = 0;
         public int eatingSlot = -1; // Слот с едой которую едим
+        public int potionCooldown = 0; // Кулдаун на зелья
+        public int buffPotionCooldown = 0; // Кулдаун на баффовые зелья
+        public boolean isThrowingPotion = false; // Бросаем зелье - не смотреть на цель
+        public int throwingPotionTicks = 0;
+        public java.util.List<Integer> potionsToThrow = new java.util.ArrayList<>(); // Очередь зелий для броска
     }
     
     public static BotState getState(String botName) {
@@ -44,6 +50,44 @@ public class BotUtils {
         if (state.shieldCooldown > 0) state.shieldCooldown--;
         if (state.eatCooldown > 0) state.eatCooldown--;
         if (state.windChargeCooldown > 0) state.windChargeCooldown--;
+        if (state.potionCooldown > 0) state.potionCooldown--;
+        if (state.buffPotionCooldown > 0) state.buffPotionCooldown--;
+        
+        // Обработка броска зелья - смотрим вниз и бросаем
+        if (state.isThrowingPotion) {
+            state.throwingPotionTicks++;
+            // Принудительно смотрим вниз
+            bot.setPitch(90);
+            
+            if (state.throwingPotionTicks == 2) {
+                // Бросаем на 2-й тик
+                executeCommand(server, bot, "player " + bot.getName().getString() + " use once");
+            }
+            if (state.throwingPotionTicks >= 5) {
+                // Проверяем есть ли ещё зелья в очереди
+                if (!state.potionsToThrow.isEmpty()) {
+                    int nextSlot = state.potionsToThrow.remove(0);
+                    var inventory = bot.getInventory();
+                    
+                    // Перемещаем в хотбар если нужно
+                    if (nextSlot >= 9) {
+                        ItemStack potion = inventory.getStack(nextSlot);
+                        ItemStack current = inventory.getStack(8);
+                        inventory.setStack(nextSlot, current);
+                        inventory.setStack(8, potion);
+                        nextSlot = 8;
+                    }
+                    
+                    ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(nextSlot);
+                    state.throwingPotionTicks = 0; // Сбрасываем для следующего зелья
+                } else {
+                    // Очередь пуста - заканчиваем
+                    state.isThrowingPotion = false;
+                    state.throwingPotionTicks = 0;
+                }
+            }
+            return; // Не делаем ничего другого пока бросаем
+        }
         
         // Плавание
         handleSwimming(bot);
@@ -51,6 +95,11 @@ public class BotUtils {
         // Авто-тотем
         if (settings.isAutoTotemEnabled()) {
             handleAutoTotem(bot);
+        }
+        
+        // Авто-баффы (зелья силы, скорости, огнестойкости) когда в бою
+        if (settings.isAutoPotionEnabled() && !state.isEating) {
+            handleAutoBuffPotions(bot, state, server);
         }
         
         // Авто-еда (приоритет над щитом)
@@ -104,6 +153,176 @@ public class BotUtils {
                 return;
             }
         }
+    }
+    
+    /**
+     * Авто-баффы - зелья силы, скорости, огнестойкости
+     * Используются когда бот в бою и эффект отсутствует или заканчивается
+     * Бросает ВСЕ нужные зелья сразу
+     */
+    private static void handleAutoBuffPotions(ServerPlayerEntity bot, BotState state, MinecraftServer server) {
+        // Проверяем в бою ли бот
+        var combatState = BotCombat.getState(bot.getName().getString());
+        if (combatState.target == null) return; // Не в бою
+        
+        if (state.buffPotionCooldown > 0) return; // Кулдаун
+        if (state.isThrowingPotion) return; // Уже бросаем
+        
+        var inventory = bot.getInventory();
+        
+        // Собираем все нужные зелья в очередь
+        java.util.List<Integer> potionsToUse = new java.util.ArrayList<>();
+        
+        // Проверяем нужны ли баффы (эффект отсутствует или заканчивается < 5 сек)
+        boolean needStrength = !hasEffect(bot, StatusEffects.STRENGTH, 100);
+        boolean needSpeed = !hasEffect(bot, StatusEffects.SPEED, 100);
+        boolean needFireResist = !hasEffect(bot, StatusEffects.FIRE_RESISTANCE, 100);
+        
+        if (needStrength) {
+            int slot = findSplashBuffPotion(inventory, "strength");
+            if (slot >= 0) potionsToUse.add(slot);
+        }
+        
+        if (needSpeed) {
+            int slot = findSplashBuffPotion(inventory, "swiftness");
+            if (slot < 0) slot = findSplashBuffPotion(inventory, "speed");
+            if (slot >= 0) potionsToUse.add(slot);
+        }
+        
+        if (needFireResist) {
+            int slot = findSplashBuffPotion(inventory, "fire_resistance");
+            if (slot >= 0) potionsToUse.add(slot);
+        }
+        
+        // Если есть зелья для броска - начинаем
+        if (!potionsToUse.isEmpty()) {
+            // Берём первое зелье
+            int firstSlot = potionsToUse.remove(0);
+            
+            // Перемещаем в хотбар если нужно
+            if (firstSlot >= 9) {
+                ItemStack potion = inventory.getStack(firstSlot);
+                ItemStack current = inventory.getStack(8);
+                inventory.setStack(firstSlot, current);
+                inventory.setStack(8, potion);
+                firstSlot = 8;
+            }
+            
+            ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(firstSlot);
+            
+            // Сохраняем остальные зелья в очередь
+            state.potionsToThrow.clear();
+            state.potionsToThrow.addAll(potionsToUse);
+            
+            // Начинаем бросок
+            state.isThrowingPotion = true;
+            state.throwingPotionTicks = 0;
+            state.buffPotionCooldown = 100; // Кулдаун после всех баффов (5 сек)
+        }
+    }
+    
+    /**
+     * Ищет ВЗРЫВНОЕ баффовое зелье по типу (для броска под себя)
+     */
+    private static int findSplashBuffPotion(net.minecraft.entity.player.PlayerInventory inventory, String effectName) {
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty()) continue;
+            
+            Item item = stack.getItem();
+            // Только взрывные зелья для броска
+            if (!(item instanceof SplashPotionItem) && !(item instanceof LingeringPotionItem)) {
+                continue;
+            }
+            
+            var potionContents = stack.get(DataComponentTypes.POTION_CONTENTS);
+            if (potionContents == null) continue;
+            
+            // Проверяем по ID зелья
+            var potion = potionContents.potion();
+            if (potion.isPresent()) {
+                String potionName = potion.get().getIdAsString().toLowerCase();
+                if (potionName.contains(effectName)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+    
+    /**
+     * Проверяет есть ли эффект с минимальной длительностью
+     */
+    private static boolean hasEffect(ServerPlayerEntity bot, net.minecraft.registry.entry.RegistryEntry<net.minecraft.entity.effect.StatusEffect> effect, int minDuration) {
+        var instance = bot.getStatusEffect(effect);
+        if (instance == null) return false;
+        return instance.getDuration() > minDuration;
+    }
+    
+    /**
+     * Ищет баффовое зелье по типу
+     */
+    private static int findBuffPotion(net.minecraft.entity.player.PlayerInventory inventory, String effectName) {
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty()) continue;
+            
+            Item item = stack.getItem();
+            if (!(item instanceof PotionItem) && !(item instanceof SplashPotionItem) && !(item instanceof LingeringPotionItem)) {
+                continue;
+            }
+            
+            var potionContents = stack.get(DataComponentTypes.POTION_CONTENTS);
+            if (potionContents == null) continue;
+            
+            // Проверяем по ID зелья
+            var potion = potionContents.potion();
+            if (potion.isPresent()) {
+                String potionName = potion.get().getIdAsString().toLowerCase();
+                if (potionName.contains(effectName)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+    
+    /**
+     * Использует баффовое зелье
+     */
+    private static boolean useBuffPotion(ServerPlayerEntity bot, BotState state, int slot, MinecraftServer server) {
+        var inventory = bot.getInventory();
+        ItemStack potionStack = inventory.getStack(slot);
+        Item potionItem = potionStack.getItem();
+        
+        // Перемещаем в хотбар если нужно
+        if (slot >= 9) {
+            ItemStack current = inventory.getStack(8);
+            inventory.setStack(slot, current);
+            inventory.setStack(8, potionStack);
+            slot = 8;
+        }
+        
+        // Переключаем слот
+        ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(slot);
+        
+        if (potionItem instanceof SplashPotionItem || potionItem instanceof LingeringPotionItem) {
+            // Взрывное зелье - начинаем процесс броска под себя
+            state.isThrowingPotion = true;
+            state.throwingPotionTicks = 0;
+            state.buffPotionCooldown = 15;
+            return true;
+        } else if (potionItem instanceof PotionItem) {
+            // Обычное зелье - пьём
+            state.isEating = true;
+            state.eatingTicks = 0;
+            state.eatingSlot = slot;
+            state.buffPotionCooldown = 10;
+            bot.setCurrentHand(Hand.MAIN_HAND);
+            return true;
+        }
+        
+        return false;
     }
     
     /**
@@ -427,5 +646,126 @@ public class BotUtils {
         } catch (Exception e) {
             // Игнорируем ошибки
         }
+    }
+    
+    /**
+     * Проверяет есть ли еда в инвентаре
+     */
+    public static boolean hasFood(ServerPlayerEntity bot) {
+        var inventory = bot.getInventory();
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (!stack.isEmpty()) {
+                var foodComponent = stack.getItem().getComponents().get(DataComponentTypes.FOOD);
+                if (foodComponent != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Пробует использовать зелье исцеления
+     * Возвращает true если начал пить/бросил зелье
+     */
+    public static boolean tryUseHealingPotion(ServerPlayerEntity bot, MinecraftServer server) {
+        BotState state = getState(bot.getName().getString());
+        if (state.isEating) return false; // Уже что-то делаем
+        if (state.potionCooldown > 0) return false; // Кулдаун на зелья
+        
+        var inventory = bot.getInventory();
+        
+        // Ищем зелье исцеления (обычное или взрывное)
+        int potionSlot = findHealingPotion(inventory);
+        if (potionSlot < 0) return false;
+        
+        ItemStack potionStack = inventory.getStack(potionSlot);
+        Item potionItem = potionStack.getItem();
+        
+        // Перемещаем в хотбар если нужно
+        if (potionSlot >= 9) {
+            ItemStack current = inventory.getStack(8);
+            inventory.setStack(potionSlot, current);
+            inventory.setStack(8, potionStack);
+            potionSlot = 8;
+        }
+        
+        // Переключаем слот
+        ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(potionSlot);
+        
+        if (potionItem instanceof SplashPotionItem || potionItem instanceof LingeringPotionItem) {
+            // Взрывное зелье - начинаем процесс броска под себя
+            state.isThrowingPotion = true;
+            state.throwingPotionTicks = 0;
+            state.potionCooldown = 10;
+            return true;
+        } else if (potionItem instanceof PotionItem) {
+            // Обычное зелье - пьём
+            state.isEating = true;
+            state.eatingTicks = 0;
+            state.eatingSlot = potionSlot;
+            state.potionCooldown = 5; // 5 тиков после питья
+            bot.setCurrentHand(Hand.MAIN_HAND);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Ищет зелье исцеления в инвентаре
+     */
+    private static int findHealingPotion(net.minecraft.entity.player.PlayerInventory inventory) {
+        // Приоритет: взрывное > обычное
+        int splashSlot = -1;
+        int normalSlot = -1;
+        
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty()) continue;
+            
+            Item item = stack.getItem();
+            
+            // Проверяем что это зелье исцеления
+            if (isHealingPotion(stack)) {
+                if (item instanceof SplashPotionItem || item instanceof LingeringPotionItem) {
+                    if (splashSlot < 0) splashSlot = i;
+                } else if (item instanceof PotionItem) {
+                    if (normalSlot < 0) normalSlot = i;
+                }
+            }
+        }
+        
+        // Предпочитаем взрывное (быстрее)
+        return splashSlot >= 0 ? splashSlot : normalSlot;
+    }
+    
+    /**
+     * Проверяет является ли зелье зельем исцеления
+     */
+    private static boolean isHealingPotion(ItemStack stack) {
+        var potionContents = stack.get(DataComponentTypes.POTION_CONTENTS);
+        if (potionContents == null) return false;
+        
+        // Проверяем эффекты зелья
+        for (var effect : potionContents.getEffects()) {
+            var effectType = effect.getEffectType().value();
+            String effectName = effectType.toString().toLowerCase();
+            if (effectName.contains("healing") || effectName.contains("instant_health")) {
+                return true;
+            }
+        }
+        
+        // Также проверяем по ID зелья
+        var potion = potionContents.potion();
+        if (potion.isPresent()) {
+            String potionName = potion.get().getIdAsString().toLowerCase();
+            if (potionName.contains("healing") || potionName.contains("health")) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }

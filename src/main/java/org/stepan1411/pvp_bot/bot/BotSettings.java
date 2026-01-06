@@ -54,7 +54,7 @@ public class BotSettings {
     // Включение типов оружия
     private boolean rangedEnabled = true;         // Использовать лук/арбалет
     private boolean maceEnabled = true;           // Использовать булаву
-    private boolean spearEnabled = true;          // Использовать копьё (1.21.11)
+    private boolean spearEnabled = false;         // Использовать копьё (1.21.11) - ВЫКЛЮЧЕНО из-за бага Carpet
     
     // Настройки копья (Spear) - 1.21.11
     private double spearRange = 4.5;              // Дистанция для jab атаки
@@ -68,8 +68,11 @@ public class BotSettings {
     private boolean autoShieldEnabled = true;     // Авто-щит
     private boolean shieldBreakEnabled = true;    // Сбивать щит топором
     private int minHungerToEat = 14;              // Минимальный голод для еды
+    private boolean autoPotionEnabled = true;     // Авто-зелья исцеления
     
     // ============ Навигация и движение ============
+    private boolean retreatEnabled = true;        // Отступать при низком HP
+    private double retreatHealthPercent = 0.3;    // Процент HP для отступления (0.3 = 30%)
     private boolean bhopEnabled = true;           // Bunny hop (прыжки при беге)
     private int bhopCooldown = 12;                // Кулдаун между прыжками (тики)
     private double jumpBoost = 0.0;               // Дополнительная высота прыжка (0.0 - 0.5)
@@ -161,8 +164,11 @@ public class BotSettings {
     public boolean isAutoShieldEnabled() { return autoShieldEnabled; }
     public boolean isShieldBreakEnabled() { return shieldBreakEnabled; }
     public int getMinHungerToEat() { return minHungerToEat; }
+    public boolean isAutoPotionEnabled() { return autoPotionEnabled; }
     
     // Getters - Navigation
+    public boolean isRetreatEnabled() { return retreatEnabled; }
+    public double getRetreatHealthPercent() { return retreatHealthPercent; }
     public boolean isBhopEnabled() { return bhopEnabled; }
     public int getBhopCooldown() { return bhopCooldown; }
     public double getJumpBoost() { return jumpBoost; }
@@ -280,8 +286,14 @@ public class BotSettings {
         this.minHungerToEat = Math.max(1, Math.min(20, value)); 
         save(); 
     }
+    public void setAutoPotionEnabled(boolean value) { this.autoPotionEnabled = value; save(); }
     
     // Setters - Navigation
+    public void setRetreatEnabled(boolean value) { this.retreatEnabled = value; save(); }
+    public void setRetreatHealthPercent(double value) { 
+        this.retreatHealthPercent = Math.max(0.1, Math.min(0.9, value)); 
+        save(); 
+    }
     public void setBhopEnabled(boolean value) { this.bhopEnabled = value; save(); }
     public void setBhopCooldown(int value) { 
         this.bhopCooldown = Math.max(5, Math.min(30, value)); 

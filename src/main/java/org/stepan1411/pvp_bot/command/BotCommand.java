@@ -15,6 +15,7 @@ import org.stepan1411.pvp_bot.bot.BotCombat;
 import org.stepan1411.pvp_bot.bot.BotFaction;
 import org.stepan1411.pvp_bot.bot.BotKits;
 import org.stepan1411.pvp_bot.bot.BotManager;
+import org.stepan1411.pvp_bot.bot.BotNameGenerator;
 import org.stepan1411.pvp_bot.bot.BotSettings;
 
 import java.util.stream.Collectors;
@@ -45,10 +46,18 @@ public class BotCommand {
         dispatcher.register(
             CommandManager.literal("pvpbot")
                 
-                // /pvpbot spawn <name>
+                // /pvpbot spawn [name] - без имени генерирует случайное
                 .then(CommandManager.literal("spawn")
+                    .executes(ctx -> spawnBot(ctx.getSource(), BotNameGenerator.generateUniqueName()))
                     .then(CommandManager.argument("name", StringArgumentType.word())
                         .executes(ctx -> spawnBot(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
+                    )
+                )
+                
+                // /pvpbot massspawn <num> - спавнит несколько ботов с рандомными именами
+                .then(CommandManager.literal("massspawn")
+                    .then(CommandManager.argument("count", IntegerArgumentType.integer(1, 50))
+                        .executes(ctx -> massSpawnBots(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "count")))
                     )
                 )
                 
@@ -502,6 +511,18 @@ public class BotCommand {
                             )
                         )
                     )
+                    // /pvpbot faction attack <faction> <target> - вся фракция атакует цель
+                    .then(CommandManager.literal("attack")
+                        .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .suggests(FACTION_SUGGESTIONS)
+                            .then(CommandManager.argument("target", StringArgumentType.word())
+                                .suggests(TARGET_SUGGESTIONS)
+                                .executes(ctx -> factionAttack(ctx.getSource(), 
+                                    StringArgumentType.getString(ctx, "faction"),
+                                    StringArgumentType.getString(ctx, "target")))
+                            )
+                        )
+                    )
                 )
                 
                 // /pvpbot settings viewdistance [5-128] - дальность видимости
@@ -618,6 +639,19 @@ public class BotCommand {
             source.sendError(Text.literal("Bot '" + name + "' already exists!"));
             return 0;
         }
+    }
+    
+    private static int massSpawnBots(ServerCommandSource source, int count) {
+        int spawned = 0;
+        for (int i = 0; i < count; i++) {
+            String name = BotNameGenerator.generateUniqueName();
+            if (BotManager.spawnBot(source.getServer(), name, source)) {
+                spawned++;
+            }
+        }
+        final int total = spawned;
+        source.sendFeedback(() -> Text.literal("Spawned " + total + " bots!"), true);
+        return spawned;
     }
 
     private static int removeBot(ServerCommandSource source, String name) {
@@ -874,6 +908,28 @@ public class BotCommand {
         
         final int given = count;
         source.sendFeedback(() -> Text.literal("Gave items to " + given + " members of faction '" + faction + "'"), true);
+        return count;
+    }
+    
+    private static int factionAttack(ServerCommandSource source, String faction, String targetName) {
+        if (!BotFaction.getAllFactions().contains(faction)) {
+            source.sendError(Text.literal("Faction '" + faction + "' not found!"));
+            return 0;
+        }
+        
+        var members = BotFaction.getMembers(faction);
+        int count = 0;
+        
+        for (String memberName : members) {
+            // Только боты могут атаковать
+            if (BotManager.getAllBots().contains(memberName)) {
+                BotCombat.setTarget(memberName, targetName);
+                count++;
+            }
+        }
+        
+        final int attacking = count;
+        source.sendFeedback(() -> Text.literal("Faction '" + faction + "' (" + attacking + " bots) attacking " + targetName + "!"), true);
         return count;
     }
     
