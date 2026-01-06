@@ -54,6 +54,13 @@ public class BotSettings {
     // Включение типов оружия
     private boolean rangedEnabled = true;         // Использовать лук/арбалет
     private boolean maceEnabled = true;           // Использовать булаву
+    private boolean spearEnabled = true;          // Использовать копьё (1.21.11)
+    
+    // Настройки копья (Spear) - 1.21.11
+    private double spearRange = 4.5;              // Дистанция для jab атаки
+    private double spearChargeRange = 12.0;       // Дистанция для charge атаки
+    private int spearMinChargeTime = 15;          // Минимальное время заряда
+    private int spearMaxChargeTime = 40;          // Максимальное время заряда
     
     // ============ Утилиты ============
     private boolean autoTotemEnabled = true;      // Авто-тотем в offhand
@@ -142,6 +149,11 @@ public class BotSettings {
     public int getBowMinDrawTime() { return bowMinDrawTime; }
     public boolean isRangedEnabled() { return rangedEnabled; }
     public boolean isMaceEnabled() { return maceEnabled; }
+    public boolean isSpearEnabled() { return spearEnabled; }
+    public double getSpearRange() { return spearRange; }
+    public double getSpearChargeRange() { return spearChargeRange; }
+    public int getSpearMinChargeTime() { return spearMinChargeTime; }
+    public int getSpearMaxChargeTime() { return spearMaxChargeTime; }
     
     // Getters - Utils
     public boolean isAutoTotemEnabled() { return autoTotemEnabled; }
@@ -241,6 +253,23 @@ public class BotSettings {
     }
     public void setRangedEnabled(boolean value) { this.rangedEnabled = value; save(); }
     public void setMaceEnabled(boolean value) { this.maceEnabled = value; save(); }
+    public void setSpearEnabled(boolean value) { this.spearEnabled = value; save(); }
+    public void setSpearRange(double value) { 
+        this.spearRange = Math.max(2.0, Math.min(8.0, value)); 
+        save(); 
+    }
+    public void setSpearChargeRange(double value) { 
+        this.spearChargeRange = Math.max(5.0, Math.min(20.0, value)); 
+        save(); 
+    }
+    public void setSpearMinChargeTime(int value) { 
+        this.spearMinChargeTime = Math.max(5, Math.min(30, value)); 
+        save(); 
+    }
+    public void setSpearMaxChargeTime(int value) { 
+        this.spearMaxChargeTime = Math.max(20, Math.min(60, value)); 
+        save(); 
+    }
     
     // Setters - Utils
     public void setAutoTotemEnabled(boolean value) { this.autoTotemEnabled = value; save(); }

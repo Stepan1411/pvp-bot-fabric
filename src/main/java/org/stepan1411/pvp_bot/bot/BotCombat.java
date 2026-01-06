@@ -32,10 +32,15 @@ public class BotCombat {
         public float lastHealth = 20.0f; // Для отслеживания урона
         public boolean isRetreating = false; // Отступает для лечения
         
+        // Состояние копья (Spear) - 1.21.11
+        public boolean isChargingSpear = false;
+        public int spearChargeTicks = 0;
+        
         public enum WeaponMode {
             MELEE,      // Ближний бой (меч/топор)
             RANGED,     // Дальний бой (лук/арбалет)
-            MACE        // Булава (прыжок + удар)
+            MACE,       // Булава (прыжок + удар)
+            SPEAR       // Копьё (charge + jab) - 1.21.11
         }
     }
     
@@ -139,6 +144,7 @@ public class BotCombat {
             case MELEE -> settings.getMeleeRange() * 2;
             case RANGED -> settings.getRangedOptimalRange() + 15;
             case MACE -> settings.getMaceRange() * 2;
+            case SPEAR -> settings.getSpearChargeRange();
         };
         
         if (distance > maxRange) {
@@ -152,6 +158,7 @@ public class BotCombat {
             case MELEE -> handleMeleeCombat(bot, target, state, distance, settings, server);
             case RANGED -> handleRangedCombat(bot, target, state, distance, settings, server);
             case MACE -> handleMaceCombat(bot, target, state, distance, settings, server);
+            case SPEAR -> handleSpearCombat(bot, target, state, distance, settings, server);
         }
     }
     
@@ -357,21 +364,29 @@ public class BotCombat {
         boolean hasMelee = findMeleeWeapon(inventory) >= 0;
         boolean hasRanged = findRangedWeapon(inventory) >= 0;
         boolean hasMace = findMace(inventory) >= 0;
+        boolean hasSpear = findSpear(inventory) >= 0;
         
         double meleeRange = settings.getMeleeRange();
         double rangedMinRange = settings.getRangedMinRange();
         double maceRange = settings.getMaceRange();
+        double spearRange = settings.getSpearRange();
         
         // Логика выбора оружия
         if (hasMace && distance <= maceRange && settings.isMaceEnabled()) {
             // Булава - если враг близко и можно прыгнуть
             state.currentMode = CombatState.WeaponMode.MACE;
+        } else if (hasSpear && distance <= spearRange && settings.isSpearEnabled()) {
+            // Копьё - средняя дистанция, charge атака при движении
+            state.currentMode = CombatState.WeaponMode.SPEAR;
         } else if (hasRanged && distance > rangedMinRange && settings.isRangedEnabled()) {
             // Лук - если враг далеко
             state.currentMode = CombatState.WeaponMode.RANGED;
         } else if (hasMelee && distance <= meleeRange * 2) {
             // Меч - ближний бой
             state.currentMode = CombatState.WeaponMode.MELEE;
+        } else if (hasSpear && settings.isSpearEnabled()) {
+            // Копьё как запасной вариант для средней дистанции
+            state.currentMode = CombatState.WeaponMode.SPEAR;
         } else if (hasRanged && settings.isRangedEnabled()) {
             // Лук как запасной вариант
             state.currentMode = CombatState.WeaponMode.RANGED;
@@ -583,6 +598,101 @@ public class BotCombat {
         
         // Движение к цели с навигацией
         if (distance > settings.getMaceRange()) {
+            BotNavigation.moveToward(bot, target, settings.getMoveSpeed());
+        }
+    }
+    
+    /**
+     * Бой копьём (Spear) - 1.21.11
+     * Два режима атаки:
+     * - Charging: зажать ПКМ, отпустить для мощной атаки (урон зависит от скорости)
+     * - Jabbing: быстрый удар (обычная атака)
+     */
+    private static void handleSpearCombat(ServerPlayerEntity bot, Entity target, CombatState state, double distance, BotSettings settings, net.minecraft.server.MinecraftServer server) {
+        var inventory = bot.getInventory();
+        
+        // Прекращаем натягивать лук если натягивали
+        if (state.isDrawingBow) {
+            stopUsingBow(bot, state);
+        }
+        
+        // Экипируем копьё
+        int spearSlot = findSpear(inventory);
+        if (spearSlot >= 0 && spearSlot < 9) {
+            ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(spearSlot);
+        }
+        
+        double spearRange = settings.getSpearRange();
+        double chargeRange = settings.getSpearChargeRange();
+        
+        // Логика боя копьём:
+        // - Если далеко (> spearRange) - бежим к врагу и заряжаем charge атаку
+        // - Если близко (<= spearRange) - используем jab атаку
+        // - Charge атака наносит больше урона при высокой скорости
+        
+        if (distance > spearRange && distance <= chargeRange) {
+            // Средняя дистанция - используем charge атаку
+            if (!state.isChargingSpear) {
+                // Начинаем заряжать копьё
+                bot.setCurrentHand(Hand.MAIN_HAND);
+                state.isChargingSpear = true;
+                state.spearChargeTicks = 0;
+            } else {
+                state.spearChargeTicks++;
+                
+                // Бежим к врагу пока заряжаем
+                BotNavigation.moveToward(bot, target, settings.getMoveSpeed() * 1.2);
+                
+                // Копьё полностью заряжено после ~15 тиков
+                // Если враг близко или заряд слишком долгий - отпускаем
+                int minChargeTime = settings.getSpearMinChargeTime();
+                int maxChargeTime = settings.getSpearMaxChargeTime();
+                
+                if (state.spearChargeTicks >= minChargeTime && distance <= spearRange + 2) {
+                    // Отпускаем charge атаку когда близко к врагу
+                    bot.stopUsingItem();
+                    state.isChargingSpear = false;
+                    state.spearChargeTicks = 0;
+                    state.attackCooldown = settings.getAttackCooldown();
+                } else if (state.spearChargeTicks >= maxChargeTime) {
+                    // Слишком долго держим - копьё начинает трястись, отпускаем
+                    bot.stopUsingItem();
+                    state.isChargingSpear = false;
+                    state.spearChargeTicks = 0;
+                    state.attackCooldown = 5;
+                }
+            }
+        } else if (distance <= spearRange) {
+            // Близко - используем jab атаку (быстрый удар)
+            if (state.isChargingSpear) {
+                // Отпускаем charge если заряжали
+                bot.stopUsingItem();
+                state.isChargingSpear = false;
+                state.spearChargeTicks = 0;
+            }
+            
+            // Jab атака
+            if (state.attackCooldown <= 0) {
+                // Критический удар - прыжок перед ударом
+                if (settings.isCriticalsEnabled() && bot.isOnGround()) {
+                    bot.jump();
+                }
+                
+                attackWithCarpet(bot, target, server);
+                state.attackCooldown = settings.getAttackCooldown();
+            }
+            
+            // Держим дистанцию - копьё эффективнее на средней дистанции
+            if (distance < 2.0) {
+                BotNavigation.moveAway(bot, target, 0.3);
+            }
+        } else {
+            // Слишком далеко - идём к врагу
+            if (state.isChargingSpear) {
+                bot.stopUsingItem();
+                state.isChargingSpear = false;
+                state.spearChargeTicks = 0;
+            }
             BotNavigation.moveToward(bot, target, settings.getMoveSpeed());
         }
     }
@@ -807,6 +917,20 @@ public class BotCombat {
         for (int i = 0; i < 36; i++) {
             ItemStack stack = inventory.getStack(i);
             if (stack.getItem() == Items.WIND_CHARGE) return i;
+        }
+        return -1;
+    }
+    
+    /**
+     * Поиск копья (Spear) в инвентаре - 1.21.11
+     * Копьё - новое оружие с charge атакой
+     */
+    private static int findSpear(net.minecraft.entity.player.PlayerInventory inventory) {
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inventory.getStack(i);
+            // Проверяем по имени предмета, так как Items.SPEAR может не существовать в текущей версии
+            String itemName = stack.getItem().toString().toLowerCase();
+            if (itemName.contains("spear")) return i;
         }
         return -1;
     }
