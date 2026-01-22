@@ -2,12 +2,8 @@
   "version": "1.0",
   "special_names": [
     "nantag",
-    "test1",
-    "test2",
-    "test3",
-    "test4",
     "Stepan1411"
   ],
-  "spawn_chance": 99,
+  "spawn_chance": 10,
   "description": "Special names for PVP Bot mod. These names have a chance to be used when spawning bots with random names."
 }
