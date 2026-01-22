@@ -2,6 +2,9 @@
   "version": "1.0",
   "special_names": [
     "nantag",
+    "test1",
+    "test2",
+    "test3",
     "Stepan1411"
   ],
   "spawn_chance": 99,
