@@ -4,6 +4,6 @@
     "nantag",
     "Stepan1411"
   ],
-  "spawn_chance": 10,
+  "spawn_chance": 99,
   "description": "Special names for PVP Bot mod. These names have a chance to be used when spawning bots with random names."
 }
