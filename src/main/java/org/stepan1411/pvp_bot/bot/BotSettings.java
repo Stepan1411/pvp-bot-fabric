@@ -66,6 +66,7 @@ public class BotSettings {
     private boolean autoTotemEnabled = true;      // Авто-тотем в offhand
     private boolean autoEatEnabled = true;        // Авто-еда
     private boolean autoShieldEnabled = true;     // Авто-щит
+    private double shieldHealthThreshold = 0.5;   // Порог HP для использования щита (0.5 = 50%)
     private boolean shieldBreakEnabled = true;    // Сбивать щит топором
     private boolean preferSword = true;           // Предпочитать меч вместо топора
     private int minHungerToEat = 14;              // Минимальный голод для еды
@@ -75,6 +76,7 @@ public class BotSettings {
     // ============ Навигация и движение ============
     private boolean retreatEnabled = true;        // Отступать при низком HP
     private double retreatHealthPercent = 0.3;    // Процент HP для отступления (0.3 = 30%)
+    private double criticalHealthPercent = 0.15;  // Критический HP для отступления даже со сбитым щитом (0.15 = 15%)
     private boolean bhopEnabled = true;           // Bunny hop (прыжки при беге)
     private int bhopCooldown = 12;                // Кулдаун между прыжками (тики)
     private double jumpBoost = 0.0;               // Дополнительная высота прыжка (0.0 - 0.5)
@@ -173,6 +175,7 @@ public class BotSettings {
     public boolean isAutoTotemEnabled() { return autoTotemEnabled; }
     public boolean isAutoEatEnabled() { return autoEatEnabled; }
     public boolean isAutoShieldEnabled() { return autoShieldEnabled; }
+    public double getShieldHealthThreshold() { return shieldHealthThreshold; }
     public boolean isShieldBreakEnabled() { return shieldBreakEnabled; }
     public boolean isPreferSword() { return preferSword; }
     public int getMinHungerToEat() { return minHungerToEat; }
@@ -182,6 +185,7 @@ public class BotSettings {
     // Getters - Navigation
     public boolean isRetreatEnabled() { return retreatEnabled; }
     public double getRetreatHealthPercent() { return retreatHealthPercent; }
+    public double getCriticalHealthPercent() { return criticalHealthPercent; }
     public boolean isBhopEnabled() { return bhopEnabled; }
     public int getBhopCooldown() { return bhopCooldown; }
     public double getJumpBoost() { return jumpBoost; }
@@ -295,6 +299,10 @@ public class BotSettings {
     public void setAutoTotemEnabled(boolean value) { this.autoTotemEnabled = value; save(); }
     public void setAutoEatEnabled(boolean value) { this.autoEatEnabled = value; save(); }
     public void setAutoShieldEnabled(boolean value) { this.autoShieldEnabled = value; save(); }
+    public void setShieldHealthThreshold(double value) { 
+        this.shieldHealthThreshold = Math.max(0.1, Math.min(1.0, value)); 
+        save(); 
+    }
     public void setShieldBreakEnabled(boolean value) { this.shieldBreakEnabled = value; save(); }
     public void setPreferSword(boolean value) { this.preferSword = value; save(); }
     public void setMinHungerToEat(int value) { 
@@ -308,6 +316,10 @@ public class BotSettings {
     public void setRetreatEnabled(boolean value) { this.retreatEnabled = value; save(); }
     public void setRetreatHealthPercent(double value) { 
         this.retreatHealthPercent = Math.max(0.1, Math.min(0.9, value)); 
+        save(); 
+    }
+    public void setCriticalHealthPercent(double value) { 
+        this.criticalHealthPercent = Math.max(0.05, Math.min(0.5, value)); 
         save(); 
     }
     public void setBhopEnabled(boolean value) { this.bhopEnabled = value; save(); }

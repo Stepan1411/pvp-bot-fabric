@@ -38,6 +38,13 @@ public class BotCombat {
         
         // Состояние паутины
         public int cobwebCooldown = 0; // Кулдаун на размещение паутины
+        
+        // Состояние щита
+        public boolean isUsingShield = false; // Щит активен через Carpet команду
+        public int shieldToggleCooldown = 0; // Кулдаун на переключение щита (предотвращает спам)
+        public int airTimeTicks = 0; // Сколько тиков бот в воздухе
+        public boolean shieldBroken = false; // Щит был сбит топором
+        public long shieldBrokenTime = 0; // Время когда щит был сбит
         public boolean isPlacingCobweb = false; // Процесс размещения паутины
         public int cobwebPlaceTicks = 0; // Тики размещения
         
@@ -83,6 +90,9 @@ public class BotCombat {
         if (state.attackCooldown > 0) {
             state.attackCooldown--;
         }
+        if (state.shieldToggleCooldown > 0) {
+            state.shieldToggleCooldown--;
+        }
         if (state.cobwebCooldown > 0) {
             state.cobwebCooldown--;
         }
@@ -116,10 +126,17 @@ public class BotCombat {
         // Проверяем нужно ли отступать (низкое HP)
         float health = bot.getHealth();
         float maxHealth = bot.getMaxHealth();
-        boolean lowHealth = health <= maxHealth * settings.getRetreatHealthPercent();
+        float healthPercent = health / maxHealth;
+        boolean lowHealth = healthPercent <= settings.getRetreatHealthPercent();
+        boolean criticalHealth = healthPercent <= settings.getCriticalHealthPercent();
         
         // Проверяем есть ли еда для отступления
         boolean hasFood = BotUtils.hasFood(bot);
+        
+        // Сбрасываем флаг сбитого щита через 5 секунд
+        if (state.shieldBroken && System.currentTimeMillis() - state.shieldBrokenTime > 5000) {
+            state.shieldBroken = false;
+        }
         
         // Проверяем ест ли бот - НИКОГДА не переключаем слоты пока едим!
         var utilsState = BotUtils.getState(bot.getName().getString());
@@ -145,10 +162,40 @@ public class BotCombat {
             }
         }
         
+        // Логика отступления:
+        // 1. Если HP критическое (< 15%) - ВСЕГДА отступаем, даже если щит сбит
+        // 2. Если HP низкое (< 30%) И щит НЕ сбит - отступаем
+        // 3. Если щит сбит - продолжаем драться пока HP не станет критическим
+        boolean shouldRetreat = settings.isRetreatEnabled() && hasFood && 
+                               (criticalHealth || (lowHealth && !state.shieldBroken));
+        
         // Отступаем если низкое HP, включено отступление И есть еда
         // Если еды нет - нет смысла отступать, лучше драться до конца
-        if (lowHealth && settings.isRetreatEnabled() && hasFood) {
+        if (shouldRetreat) {
             state.isRetreating = true;
+            
+            // Используем щит при отступлении для защиты
+            if (settings.isAutoShieldEnabled()) {
+                var inventory = bot.getInventory();
+                // Экипируем щит в offhand если его там нет
+                ItemStack offhandItem = bot.getOffHandStack();
+                if (offhandItem.isEmpty() || !offhandItem.getItem().toString().contains("shield")) {
+                    int shieldSlot = findShield(inventory);
+                    if (shieldSlot >= 0) {
+                        // Перемещаем щит в offhand (слот 40)
+                        ItemStack shield = inventory.getStack(shieldSlot);
+                        inventory.setStack(40, shield);
+                        inventory.setStack(shieldSlot, ItemStack.EMPTY);
+                    }
+                }
+                
+                // Поднимаем щит при отступлении
+                if (!state.isUsingShield && state.shieldToggleCooldown <= 0) {
+                    startUsingShield(bot, server);
+                    state.isUsingShield = true;
+                }
+            }
+            
             // Убегаем пока враг ближе 25 блоков (скорость 1.5 = максимальный бхоп)
             if (distance < 25.0) {
                 // Пробуем поставить паутину под врага при отступлении
@@ -460,6 +507,47 @@ public class BotCombat {
             BotNavigation.moveAway(bot, target, 0.3);
         }
         
+        // Проверяем HP и используем щит если нужно
+        float healthPercent = bot.getHealth() / bot.getMaxHealth();
+        boolean shouldUseShield = settings.isAutoShieldEnabled() && healthPercent < settings.getShieldHealthThreshold();
+        
+        // Определяем нужно ли держать щит поднятым
+        // Опускаем щит ТОЛЬКО когда attackCooldown == 1 (за 1 тик до атаки)
+        boolean willAttackSoon = distance <= meleeRange && state.attackCooldown == 1;
+        boolean shouldHoldShield = shouldUseShield && !willAttackSoon;
+        
+        if (shouldUseShield) {
+            // Экипируем щит в offhand если его там нет
+            ItemStack offhandItem = bot.getOffHandStack();
+            if (offhandItem.isEmpty() || !offhandItem.getItem().toString().contains("shield")) {
+                int shieldSlot = findShield(inventory);
+                if (shieldSlot >= 0) {
+                    // Перемещаем щит в offhand (слот 40)
+                    ItemStack shield = inventory.getStack(shieldSlot);
+                    inventory.setStack(40, shield);
+                    inventory.setStack(shieldSlot, ItemStack.EMPTY);
+                }
+            }
+            
+            // Управляем щитом через Carpet команды
+            if (shouldHoldShield && !state.isUsingShield) {
+                // Нужно поднять щит
+                startUsingShield(bot, server);
+                state.isUsingShield = true;
+            } else if (!shouldHoldShield && state.isUsingShield) {
+                // Нужно опустить щит (за 1 тик до удара)
+                stopUsingShield(bot, server);
+                state.isUsingShield = false;
+            }
+        } else {
+            // HP нормальное - опускаем щит если он поднят
+            if (state.isUsingShield && state.shieldToggleCooldown <= 0) {
+                stopUsingShield(bot, server);
+                state.isUsingShield = false;
+                state.shieldToggleCooldown = 20; // 1 секунда кулдаун
+            }
+        }
+        
         // Атака
         if (distance <= meleeRange && state.attackCooldown <= 0) {
             // Проверяем кулдаун атаки игрока (важно для 1.9+ боя)
@@ -485,13 +573,17 @@ public class BotCombat {
                     
                     // Атакуем топором чтобы сбить щит
                     attackWithCarpet(bot, target, server);
-                    state.attackCooldown = settings.getAttackCooldown();
                     
-                    // После атаки топором сразу переключаемся обратно на меч
-                    int swordSlot = findMeleeWeapon(inventory);
-                    if (swordSlot >= 0 && swordSlot < 9) {
-                        ((org.stepan1411.pvp_bot.mixin.PlayerInventoryAccessor) inventory).setSelectedSlot(swordSlot);
-                    }
+                    // Отмечаем что щит сбит - бот продолжит драться
+                    state.shieldBroken = true;
+                    state.shieldBrokenTime = System.currentTimeMillis();
+                    
+                    // Увеличенный кулдаун если используем щит (более осторожная атака)
+                    int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                    state.attackCooldown = cooldown;
+                    
+                    // НЕ переключаемся обратно на меч сразу - это произойдёт в следующем тике
+                    // когда щит уже будет сбит и бот продолжит атаковать
                     return;
                 }
             }
@@ -511,12 +603,16 @@ public class BotCombat {
                 } else if (bot.getVelocity().y < 0) {
                     // Падаем - делаем критический удар
                     attackWithCarpet(bot, target, server);
-                    state.attackCooldown = settings.getAttackCooldown();
+                    // Увеличенный кулдаун если используем щит (более осторожная атака)
+                    int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                    state.attackCooldown = cooldown;
                 }
             } else {
                 // Критические удары выключены - атакуем сразу
                 attackWithCarpet(bot, target, server);
-                state.attackCooldown = settings.getAttackCooldown();
+                // Увеличенный кулдаун если используем щит (более осторожная атака)
+                int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                state.attackCooldown = cooldown;
             }
         } else {
             // Не атакуем - просто держим оружие в руке
@@ -836,6 +932,36 @@ public class BotCombat {
     }
     
     /**
+     * Начать использование щита через Carpet команду
+     */
+    private static void startUsingShield(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server) {
+        try {
+            server.getCommandManager().getDispatcher().execute(
+                "player " + bot.getName().getString() + " use continuous", 
+                server.getCommandSource()
+            );
+        } catch (Exception e) {
+            // Fallback - используем обычный способ
+            bot.setCurrentHand(Hand.OFF_HAND);
+        }
+    }
+    
+    /**
+     * Прекратить использование щита через Carpet команду
+     */
+    private static void stopUsingShield(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server) {
+        try {
+            server.getCommandManager().getDispatcher().execute(
+                "player " + bot.getName().getString() + " stop", 
+                server.getCommandSource()
+            );
+        } catch (Exception e) {
+            // Fallback - используем обычный способ
+            bot.clearActiveItem();
+        }
+    }
+    
+    /**
      * Поворот к цели
      */
     private static void lookAtTarget(ServerPlayerEntity bot, Entity target) {
@@ -970,6 +1096,22 @@ public class BotCombat {
         }
         
         return bestSlot;
+    }
+    
+    /**
+     * Поиск щита в инвентаре
+     */
+    private static int findShield(net.minecraft.entity.player.PlayerInventory inventory) {
+        for (int i = 0; i < 36; i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isEmpty()) continue;
+            
+            // Проверяем что это щит
+            if (stack.getItem().toString().contains("shield")) {
+                return i;
+            }
+        }
+        return -1;
     }
     
     private static double getAxeDamage(Item item) {
