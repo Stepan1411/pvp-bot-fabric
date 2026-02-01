@@ -3,108 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PVPBOT - Minecraft Combat Bot Mod</title>
+    <title>PVPBOT - Statistics</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
+    <!-- Theme Toggle -->
+    <div class="theme-toggle">
+        <input type="checkbox" id="theme-switch">
+        <label for="theme-switch" class="theme-label">
+            <span class="sun">☀️</span>
+            <span class="moon">🌙</span>
+        </label>
+    </div>
+
     <div class="container">
+        <!-- API Status Banner -->
+        <div id="api-status-banner" class="api-status-banner hidden">
+            <span>⚠️ API temporarily unavailable. Showing cached data.</span>
+        </div>
+        
         <header>
-            <h1>🤖 PVPBOT</h1>
-            <p class="subtitle">Advanced Combat Bot Mod for Minecraft 1.21.11</p>
+            <h1>🤖 PVPBOT Statistics</h1>
+            <p class="subtitle">Real-time statistics from Minecraft servers</p>
         </header>
 
+        <!-- Main Stats -->
         <section class="stats-section">
-            <h2>📊 Live Statistics</h2>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon">🟢</div>
-                    <div class="stat-value" id="servers-online">-</div>
+                    <div class="stat-value" id="servers-online">0</div>
                     <div class="stat-label">Servers Online</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">🤖</div>
-                    <div class="stat-value" id="bots-active">-</div>
+                    <div class="stat-value" id="bots-active">0</div>
                     <div class="stat-label">Bots Active</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">📥</div>
-                    <div class="stat-value" id="total-downloads">-</div>
-                    <div class="stat-label">Total Downloads</div>
+                    <div class="stat-icon">⚔️</div>
+                    <div class="stat-value" id="bots-spawned">0</div>
+                    <div class="stat-label">Bots Spawned (Total)</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">⭐</div>
-                    <div class="stat-value" id="mod-version">1.0.0</div>
-                    <div class="stat-label">Latest Version</div>
+                    <div class="stat-icon">💀</div>
+                    <div class="stat-value" id="bots-killed">0</div>
+                    <div class="stat-label">Bots Killed (Total)</div>
                 </div>
             </div>
             <p class="stats-update">Last updated: <span id="last-update">Loading...</span></p>
         </section>
 
-        <section class="features-section">
-            <h2>✨ Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <h3>⚔️ Advanced Combat</h3>
-                    <p>Smart AI with melee, ranged, and mace combat modes</p>
+        <!-- Charts -->
+        <section class="charts-section">
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Servers Online</h3>
+                    <div class="time-selector">
+                        <button class="time-btn active" data-period="1h" data-chart="servers">1H</button>
+                        <button class="time-btn" data-period="1d" data-chart="servers">1D</button>
+                        <button class="time-btn" data-period="1w" data-chart="servers">1W</button>
+                        <button class="time-btn" data-period="1m" data-chart="servers">1M</button>
+                        <button class="time-btn" data-period="1y" data-chart="servers">1Y</button>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>🛡️ Auto Shield</h3>
-                    <p>Automatic shield usage when HP drops below threshold</p>
+                <canvas id="serversChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Bots Active</h3>
+                    <div class="time-selector">
+                        <button class="time-btn active" data-period="1h" data-chart="bots">1H</button>
+                        <button class="time-btn" data-period="1d" data-chart="bots">1D</button>
+                        <button class="time-btn" data-period="1w" data-chart="bots">1W</button>
+                        <button class="time-btn" data-period="1m" data-chart="bots">1M</button>
+                        <button class="time-btn" data-period="1y" data-chart="bots">1Y</button>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>💥 Critical Hits</h3>
-                    <p>Intelligent jump timing for maximum damage</p>
-                </div>
-                <div class="feature-card">
-                    <h3>🍎 Auto Healing</h3>
-                    <p>Automatic food and potion consumption</p>
-                </div>
-                <div class="feature-card">
-                    <h3>🎯 Faction System</h3>
-                    <p>Team-based combat with allies and enemies</p>
-                </div>
-                <div class="feature-card">
-                    <h3>📦 Kit System</h3>
-                    <p>Pre-configured equipment loadouts</p>
-                </div>
+                <canvas id="botsChart"></canvas>
             </div>
         </section>
 
+        <!-- Download Section -->
         <section class="download-section">
             <h2>📥 Download</h2>
             <div class="download-buttons">
                 <a href="https://github.com/Stepan1411/pvp-bot-fabric/releases" class="btn btn-primary" target="_blank">
                     <span>GitHub Releases</span>
                 </a>
-                <a href="https://modrinth.com" class="btn btn-secondary" target="_blank">
+                <a href="https://modrinth.com/mod/pvp-bot-fabric" class="btn btn-secondary" target="_blank">
                     <span>Modrinth</span>
                 </a>
-                <a href="https://www.curseforge.com" class="btn btn-secondary" target="_blank">
-                    <span>CurseForge</span>
-                </a>
-            </div>
-        </section>
-
-        <section class="commands-section">
-            <h2>⌨️ Commands</h2>
-            <div class="command-list">
-                <div class="command-item">
-                    <code>/pvpbot spawn &lt;name&gt;</code>
-                    <p>Spawn a new bot</p>
-                </div>
-                <div class="command-item">
-                    <code>/pvpbot remove &lt;name&gt;</code>
-                    <p>Remove a bot</p>
-                </div>
-                <div class="command-item">
-                    <code>/pvpbot menu</code>
-                    <p>Open bot management GUI</p>
-                </div>
-                <div class="command-item">
-                    <code>/pvpbot settings gui</code>
-                    <p>Open settings GUI</p>
-                </div>
             </div>
         </section>
 
@@ -112,7 +103,6 @@
             <p>Made with ❤️ by <a href="https://github.com/Stepan1411" target="_blank">Stepan1411</a></p>
             <p>
                 <a href="https://github.com/Stepan1411/pvp-bot-fabric" target="_blank">GitHub</a> • 
-                <a href="https://discord.gg/your-discord" target="_blank">Discord</a> • 
                 <a href="https://www.youtube.com/@Stepan1411" target="_blank">YouTube</a>
             </p>
         </footer>

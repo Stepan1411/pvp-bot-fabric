@@ -408,8 +408,6 @@ public class BotUtils {
                     bot.setCurrentHand(Hand.MAIN_HAND);
                     state.isEating = true;
                     state.eatingTicks = 0;
-                    
-                    System.out.println("[PVP_BOT] " + bot.getName().getString() + " starting to eat from slot " + foodSlot + ", item: " + foodStack.getItem().getName().getString());
                 }
             }
         }

@@ -91,6 +91,9 @@ public class BotSettings {
     private int reactionDelay = 0;                // Задержка реакции в тиках (0-20)
     private boolean botsRelogs = true;            // Боты респавнятся после рестарта сервера
     
+    // ============ Статистика ============
+    private boolean sendStats = true;             // Отправлять анонимную статистику
+    
     private BotSettings() {}
     
     public static BotSettings get() {
@@ -199,6 +202,9 @@ public class BotSettings {
     public int getMistakeChance() { return mistakeChance; }
     public int getReactionDelay() { return reactionDelay; }
     public boolean isBotsRelogs() { return botsRelogs; }
+    
+    // Getters - Stats
+    public boolean isSendStats() { return sendStats; }
     
     // Setters (с автосохранением)
     public void setAutoEquipArmor(boolean value) { 

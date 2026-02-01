@@ -19,6 +19,7 @@ import org.stepan1411.pvp_bot.bot.BotManager;
 import org.stepan1411.pvp_bot.bot.BotNameGenerator;
 import org.stepan1411.pvp_bot.bot.BotSettings;
 import org.stepan1411.pvp_bot.gui.SettingsGui;
+import org.stepan1411.pvp_bot.stats.StatsReporter;
 
 import java.lang.reflect.Method;
 import java.util.stream.Collectors;
@@ -680,6 +681,11 @@ public class BotCommand {
                         )
                     )
                 )
+                
+                // /pvpbot updatestats - отправить статистику сейчас (для отладки)
+                .then(CommandManager.literal("updatestats")
+                    .executes(ctx -> updateStats(ctx.getSource()))
+                )
         );
     }
     
@@ -1266,6 +1272,20 @@ public class BotCommand {
         } catch (Exception e) {
             source.sendError(Text.literal("Failed to open menu: " + e.getMessage()));
             e.printStackTrace();
+            return 0;
+        }
+    }
+    
+    /**
+     * Отправляет статистику на сервер (для отладки)
+     */
+    private static int updateStats(ServerCommandSource source) {
+        try {
+            StatsReporter.sendStats();
+            source.sendFeedback(() -> Text.literal("Statistics sent to server! Check https://pvpbot-stats.up.railway.app/api/stats"), true);
+            return 1;
+        } catch (Exception e) {
+            source.sendError(Text.literal("Failed to send statistics: " + e.getMessage()));
             return 0;
         }
     }

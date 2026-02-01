@@ -26,6 +26,10 @@ public class BotManager {
     private static Path savePath;
     private static boolean initialized = false;
     
+    // Статистика
+    private static int botsSpawnedTotal = 0;
+    private static int botsKilledTotal = 0;
+    
     /**
      * Данные бота для сохранения
      */
@@ -49,6 +53,14 @@ public class BotManager {
             this.gamemode = bot.interactionManager.getGameMode().asString();
         }
     }
+    
+    /**
+     * Класс для сохранения статистики
+     */
+    public static class StatsData {
+        public int botsSpawnedTotal = 0;
+        public int botsKilledTotal = 0;
+    }
 
     /**
      * Инициализация - загрузка сохранённых ботов
@@ -66,6 +78,7 @@ public class BotManager {
         
         savePath = configDir.resolve("bots.json");
         loadBots();
+        loadStats();
         
         // Респавним сохранённых ботов только если включена настройка botsRelogs
         BotSettings settings = BotSettings.get();
@@ -233,6 +246,7 @@ public class BotManager {
             if (newBot != null && !bots.contains(name)) {
                 bots.add(name);
                 botDataMap.put(name, new BotData(newBot));
+                incrementBotsSpawned(); // Увеличиваем счетчик
                 saveBots();
                 System.out.println("[PVP_BOT] Added bot to list: " + name);
             }
@@ -244,6 +258,7 @@ public class BotManager {
             if (!bots.contains(name)) {
                 bots.add(name);
                 botDataMap.put(name, new BotData(newBot));
+                incrementBotsSpawned(); // Увеличиваем счетчик
                 saveBots();
             }
             return true;
@@ -253,6 +268,7 @@ public class BotManager {
         // (он появится позже и будет обработан)
         if (!bots.contains(name)) {
             bots.add(name);
+            incrementBotsSpawned(); // Увеличиваем счетчик
             saveBots();
         }
         
@@ -277,6 +293,8 @@ public class BotManager {
         } catch (Exception e) {
             // Ignore
         }
+        
+        // Убрали мгновенную отправку - статистика отправится через 30 секунд
         
         return wasInList;
     }
@@ -303,6 +321,8 @@ public class BotManager {
         bots.clear();
         botDataMap.clear(); // Очищаем данные всех ботов
         saveBots();
+        
+        // Убрали мгновенную отправку - статистика отправится через 30 секунд
     }
 
     public static int getBotCount() {
@@ -329,6 +349,7 @@ public class BotManager {
                 BotCombat.removeState(name);
                 BotUtils.removeState(name);
                 BotNavigation.resetIdle(name);
+                incrementBotsKilled(); // Увеличиваем счетчик убитых
                 changed = true;
                 System.out.println("[PVP_BOT] Removed dead bot: " + name);
             }
@@ -367,6 +388,75 @@ public class BotManager {
         }
         if (changed) {
             saveBots();
+        }
+    }
+    
+    /**
+     * Увеличивает счетчик заспавненных ботов
+     */
+    public static void incrementBotsSpawned() {
+        botsSpawnedTotal++;
+        saveStats();
+        // Убрали мгновенную отправку - статистика отправится через 30 секунд
+    }
+    
+    /**
+     * Увеличивает счетчик убитых ботов
+     */
+    public static void incrementBotsKilled() {
+        botsKilledTotal++;
+        saveStats();
+        // Убрали мгновенную отправку - статистика отправится через 30 секунд
+    }
+    
+    /**
+     * Возвращает общее количество заспавненных ботов
+     */
+    public static int getBotsSpawnedTotal() {
+        return botsSpawnedTotal;
+    }
+    
+    /**
+     * Возвращает общее количество убитых ботов
+     */
+    public static int getBotsKilledTotal() {
+        return botsKilledTotal;
+    }
+    
+    /**
+     * Сохранение статистики
+     */
+    private static void saveStats() {
+        if (savePath == null) return;
+        
+        Path statsPath = savePath.getParent().resolve("stats.json");
+        try (Writer writer = Files.newBufferedWriter(statsPath)) {
+            StatsData stats = new StatsData();
+            stats.botsSpawnedTotal = botsSpawnedTotal;
+            stats.botsKilledTotal = botsKilledTotal;
+            GSON.toJson(stats, writer);
+        } catch (Exception e) {
+            System.out.println("[PVP_BOT] Failed to save stats: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Загрузка статистики
+     */
+    private static void loadStats() {
+        if (savePath == null) return;
+        
+        Path statsPath = savePath.getParent().resolve("stats.json");
+        if (!Files.exists(statsPath)) return;
+        
+        try (Reader reader = Files.newBufferedReader(statsPath)) {
+            StatsData stats = GSON.fromJson(reader, StatsData.class);
+            if (stats != null) {
+                botsSpawnedTotal = stats.botsSpawnedTotal;
+                botsKilledTotal = stats.botsKilledTotal;
+            }
+        } catch (Exception e) {
+            System.out.println("[PVP_BOT] Failed to load stats: " + e.getMessage());
         }
     }
 }

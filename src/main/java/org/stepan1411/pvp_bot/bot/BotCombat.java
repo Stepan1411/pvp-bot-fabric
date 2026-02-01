@@ -81,7 +81,6 @@ public class BotCombat {
             if (attacker != null && attacker != bot && attacker instanceof LivingEntity) {
                 state.lastAttacker = attacker;
                 state.lastAttackTime = System.currentTimeMillis();
-                System.out.println("[PVP_BOT] Bot " + bot.getName().getString() + " damaged by " + attacker.getName().getString());
             }
         }
         state.lastHealth = currentHealth;
@@ -600,12 +599,23 @@ public class BotCombat {
                     // Прыгаем для крита
                     bot.jump();
                     return; // Не атакуем сразу, ждём пока начнём падать
-                } else if (bot.getVelocity().y < 0) {
-                    // Падаем - делаем критический удар
-                    attackWithCarpet(bot, target, server);
-                    // Увеличенный кулдаун если используем щит (более осторожная атака)
-                    int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
-                    state.attackCooldown = cooldown;
+                } else {
+                    // В воздухе - проверяем что мы падаем И прошли достаточно времени после прыжка
+                    double velocityY = bot.getVelocity().y;
+                    double fallDistance = bot.fallDistance;
+                    
+                    // Атакуем только если:
+                    // 1. Падаем вниз (velocity.y < 0)
+                    // 2. Прошли хотя бы небольшое расстояние падения (fallDistance > 0.1)
+                    // Это гарантирует что мы уже прошли пик прыжка
+                    if (velocityY < 0 && fallDistance > 0.1) {
+                        // Падаем - делаем критический удар
+                        attackWithCarpet(bot, target, server);
+                        // Увеличенный кулдаун если используем щит (более осторожная атака)
+                        int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                        state.attackCooldown = cooldown;
+                    }
+                    // Иначе просто ждём пока не начнём падать
                 }
             } else {
                 // Критические удары выключены - атакуем сразу

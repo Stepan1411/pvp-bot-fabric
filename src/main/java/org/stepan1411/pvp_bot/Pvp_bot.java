@@ -8,6 +8,7 @@ import org.stepan1411.pvp_bot.bot.BotKits;
 import org.stepan1411.pvp_bot.bot.BotManager;
 import org.stepan1411.pvp_bot.bot.BotTicker;
 import org.stepan1411.pvp_bot.command.BotCommand;
+import org.stepan1411.pvp_bot.stats.StatsReporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,10 +29,12 @@ public class Pvp_bot implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             BotManager.init(server);
             BotKits.init(server);
+            StatsReporter.start(server); // Запускаем отправку статистики
         });
         
         // Сохранение при остановке сервера
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            StatsReporter.stop(); // Останавливаем отправку статистики
             BotManager.reset(server);
         });
 

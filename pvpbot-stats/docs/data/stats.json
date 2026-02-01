@@ -1,6 +1,8 @@
 {
   "servers_online": 0,
   "bots_active": 0,
+  "bots_spawned_total": 0,
+  "bots_killed_total": 0,
   "total_downloads": 0,
   "mod_version": "1.0.0",
   "last_update": "2026-01-31T14:00:00Z",

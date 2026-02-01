@@ -17,16 +17,6 @@ public class BotDamageHandler {
                 
                 // Проверяем, является ли этот игрок нашим ботом
                 if (BotManager.getAllBots().contains(playerName)) {
-                    // Получаем атакующего
-                    Entity attacker = source.getAttacker();
-                    if (attacker == null) {
-                        attacker = source.getSource();
-                    }
-                    
-                    // Логируем для отладки
-                    String attackerName = attacker != null ? attacker.getName().getString() : "unknown";
-                    System.out.println("[PVP_BOT] Bot " + playerName + " damaged by " + attackerName + " (amount: " + amount + ")");
-                    
                     // Вызываем обработчик боя
                     BotCombat.onBotDamaged(player, source);
                 }
@@ -35,7 +25,5 @@ public class BotDamageHandler {
             // Возвращаем true чтобы урон прошёл
             return true;
         });
-        
-        System.out.println("[PVP_BOT] Damage handler registered!");
     }
 }
