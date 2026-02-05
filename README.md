@@ -56,7 +56,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **Giving Out kits**
 - **Saving kits**
 
-### 🎯 Realism and Bugs
+### 🎯 Realism
 - **Miss Chance**
 - **Error Chance**
 - **Reaction Latency**
