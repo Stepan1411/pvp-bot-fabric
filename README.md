@@ -51,10 +51,10 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **Member Management**
 - **Friendly Fire**
 
-### 🎒 Whale System
+### 🎒 Kit System
 - **Creating Sets**
-- **Giving Out Whales**
-- **Saving Whales**
+- **Giving Out kits**
+- **Saving kits**
 
 ### 🎯 Realism and Bugs
 - **Miss Chance**
