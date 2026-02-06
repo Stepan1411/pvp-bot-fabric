@@ -523,6 +523,18 @@ public class BotCommand {
                         )
                     )
                     
+                    // /pvpbot settings totempriority [true/false]
+                    .then(CommandManager.literal("totempriority")
+                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("totempriority: " + BotSettings.get().isTotemPriority()), false); return 1; })
+                        .then(CommandManager.argument("value", BoolArgumentType.bool())
+                            .executes(ctx -> {
+                                BotSettings.get().setTotemPriority(BoolArgumentType.getBool(ctx, "value"));
+                                ctx.getSource().sendFeedback(() -> Text.literal("Totem priority (don't replace with shield): " + BotSettings.get().isTotemPriority()), true);
+                                return 1;
+                            })
+                        )
+                    )
+                    
                     // /pvpbot settings retreat [true/false]
                     .then(CommandManager.literal("retreat")
                         .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("retreat: " + BotSettings.get().isRetreatEnabled()), false); return 1; })
@@ -1013,6 +1025,7 @@ public class BotCommand {
         
         source.sendFeedback(() -> Text.literal("=== Utilities ==="), false);
         source.sendFeedback(() -> Text.literal("autototem: " + s.isAutoTotemEnabled()), false);
+        source.sendFeedback(() -> Text.literal("totempriority: " + s.isTotemPriority() + " (don't replace totem with shield)"), false);
         source.sendFeedback(() -> Text.literal("autoshield: " + s.isAutoShieldEnabled()), false);
         source.sendFeedback(() -> Text.literal("autopotion: " + s.isAutoPotionEnabled()), false);
         source.sendFeedback(() -> Text.literal("shieldbreak: " + s.isShieldBreakEnabled()), false);

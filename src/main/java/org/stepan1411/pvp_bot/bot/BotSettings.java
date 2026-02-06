@@ -66,6 +66,7 @@ public class BotSettings {
     
     // ============ Утилиты ============
     private boolean autoTotemEnabled = true;      // Авто-тотем в offhand
+    private boolean totemPriority = true;         // Приоритет тотема (не заменять на щит)
     private boolean autoEatEnabled = true;        // Авто-еда
     private boolean autoShieldEnabled = true;     // Авто-щит
     private boolean autoMendEnabled = true;       // Авто-ремонт брони с Mending через XP бутылки
@@ -182,6 +183,7 @@ public class BotSettings {
     
     // Getters - Utils
     public boolean isAutoTotemEnabled() { return autoTotemEnabled; }
+    public boolean isTotemPriority() { return totemPriority; }
     public boolean isAutoEatEnabled() { return autoEatEnabled; }
     public boolean isAutoShieldEnabled() { return autoShieldEnabled; }
     public boolean isAutoMendEnabled() { return autoMendEnabled; }
@@ -313,6 +315,7 @@ public class BotSettings {
     
     // Setters - Utils
     public void setAutoTotemEnabled(boolean value) { this.autoTotemEnabled = value; save(); }
+    public void setTotemPriority(boolean value) { this.totemPriority = value; save(); }
     public void setAutoEatEnabled(boolean value) { this.autoEatEnabled = value; save(); }
     public void setAutoShieldEnabled(boolean value) { this.autoShieldEnabled = value; save(); }
     public void setAutoMendEnabled(boolean value) { this.autoMendEnabled = value; save(); }

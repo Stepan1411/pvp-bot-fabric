@@ -33,6 +33,7 @@ public class BotUtils {
         public int xpBottlesThrown = 0; // Сколько бутылок уже бросили
         public int xpBottlesNeeded = 0; // Сколько бутылок нужно бросить
         public java.util.List<Integer> potionsToThrow = new java.util.ArrayList<>(); // Очередь зелий для броска
+        public ItemStack savedOffhandItem = ItemStack.EMPTY; // Сохранённый предмет из offhand (тотем) перед блокировкой
     }
     
     public static BotState getState(String botName) {
@@ -151,8 +152,16 @@ public class BotUtils {
     
     /**
      * Авто-тотем
+     * НЕ запускается когда бот блокирует щитом
      */
     private static void handleAutoTotem(ServerPlayerEntity bot) {
+        BotState state = getState(bot.getName().getString());
+        
+        // НЕ меняем offhand когда бот блокирует щитом
+        if (state.isBlocking) {
+            return;
+        }
+        
         var inventory = bot.getInventory();
         ItemStack offhand = inventory.getStack(40);
         
@@ -495,6 +504,7 @@ public class BotUtils {
     
     /**
      * Авто-щит - блокирует только когда враг очень близко и атакует
+     * Учитывает приоритет тотема
      */
     private static void handleAutoShield(ServerPlayerEntity bot, BotState state, BotSettings settings, MinecraftServer server) {
         var inventory = bot.getInventory();
@@ -502,6 +512,18 @@ public class BotUtils {
         if (shieldSlot < 0) {
             state.isBlocking = false;
             return;
+        }
+        
+        // Если включен приоритет тотема - не заменяем тотем на щит
+        if (settings.isTotemPriority()) {
+            ItemStack offhand = inventory.getStack(40);
+            if (offhand.getItem() == Items.TOTEM_OF_UNDYING) {
+                // Тотем в offhand - не блокируем
+                if (state.isBlocking) {
+                    stopBlocking(bot, state, server);
+                }
+                return;
+            }
         }
         
         var combatState = BotCombat.getState(bot.getName().getString());
@@ -555,6 +577,11 @@ public class BotUtils {
         if (shieldSlot != 40) {
             ItemStack shield = inventory.getStack(shieldSlot);
             ItemStack offhand = inventory.getStack(40);
+            
+            // Сохраняем что было в offhand (обычно тотем)
+            state.savedOffhandItem = offhand.copy();
+            
+            // Меняем местами щит и offhand
             inventory.setStack(shieldSlot, offhand);
             inventory.setStack(40, shield);
         }
@@ -567,6 +594,31 @@ public class BotUtils {
     private static void stopBlocking(ServerPlayerEntity bot, BotState state, MinecraftServer server) {
         executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
         state.isBlocking = false;
+        
+        var inventory = bot.getInventory();
+        ItemStack currentOffhand = inventory.getStack(40);
+        
+        // Если в offhand щит и у нас есть сохранённый предмет (тотем)
+        if (currentOffhand.getItem() == Items.SHIELD && !state.savedOffhandItem.isEmpty()) {
+            // Ищем свободный слот для щита
+            int emptySlot = -1;
+            for (int i = 0; i < 36; i++) {
+                if (inventory.getStack(i).isEmpty()) {
+                    emptySlot = i;
+                    break;
+                }
+            }
+            
+            if (emptySlot >= 0) {
+                // Возвращаем щит в инвентарь
+                inventory.setStack(emptySlot, currentOffhand.copy());
+                // Возвращаем сохранённый предмет (тотем) в offhand
+                inventory.setStack(40, state.savedOffhandItem.copy());
+            }
+            
+            // Очищаем сохранённый предмет
+            state.savedOffhandItem = ItemStack.EMPTY;
+        }
     }
     
     private static int findShield(net.minecraft.entity.player.PlayerInventory inventory) {
