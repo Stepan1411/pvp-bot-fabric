@@ -29,6 +29,10 @@ public class BotNavigation {
         public Vec3d wanderTarget = null;     // Текущая цель блуждания
         public int wanderCooldown = 0;        // Кулдаун до следующей смены цели
         public int idleTicks = 0;             // Сколько тиков бот в idle
+        
+        // История пути для отладки
+        public java.util.LinkedList<Vec3d> pathHistory = new java.util.LinkedList<>();
+        public static final int MAX_PATH_HISTORY = 15; // Максимум 15 точек в истории
     }
     
     public static NavigationState getState(String botName) {
@@ -83,6 +87,20 @@ public class BotNavigation {
     private static void moveTowardPos(ServerPlayerEntity bot, Vec3d targetPos, double speed, NavigationState state) {
         var world = bot.getEntityWorld();
         Vec3d botPos = new Vec3d(bot.getX(), bot.getY(), bot.getZ());
+        
+        // === Обновляем историю пути для отладки ===
+        if (state.pathHistory.isEmpty() || botPos.distanceTo(state.pathHistory.getLast()) > 0.5) {
+            state.pathHistory.add(botPos);
+            if (state.pathHistory.size() > NavigationState.MAX_PATH_HISTORY) {
+                state.pathHistory.removeFirst();
+            }
+        }
+        // ==========================================
+        
+        // === DEBUG: Показываем путь и целевой блок ===
+        BotDebug.showPath(bot, targetPos, state.pathHistory);
+        BotDebug.showTargetBlock(bot, targetPos);
+        // =============================================
         
         // Проверяем застряли ли мы
         checkIfStuck(bot, state);

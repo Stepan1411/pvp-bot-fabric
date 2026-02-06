@@ -101,6 +101,12 @@ public class BotManager {
     }
     
     private static void restoreBotsDelayed(MinecraftServer server, Map<String, BotData> botsToRestore, int index) {
+        restoreBotsDelayedWithRetry(server, botsToRestore, index, 0);
+    }
+    
+    private static void restoreBotsDelayedWithRetry(MinecraftServer server, Map<String, BotData> botsToRestore, int index, int retryCount) {
+        final int MAX_RETRIES = 2; // Максимум 2 повторные попытки (всего 3 попытки)
+        
         if (index >= botsToRestore.size()) {
             System.out.println("[PVP_BOT] Restored " + bots.size() + " bots");
             return;
@@ -111,56 +117,92 @@ public class BotManager {
             String name = names[index];
             BotData data = botsToRestore.get(name);
             
+            // Проверяем не онлайн ли уже реальный игрок с таким ником
+            ServerPlayerEntity existingPlayer = server.getPlayerManager().getPlayer(name);
+            if (existingPlayer != null && !bots.contains(name)) {
+                System.out.println("[PVP_BOT] Skipping bot '" + name + "': real player with this name is online");
+                // Переходим к следующему боту
+                final int nextIndex = index + 1;
+                server.execute(() -> restoreBotsDelayedWithRetry(server, botsToRestore, nextIndex, 0));
+                return;
+            }
+            
             // Спавним бота с позицией и измерением
             var dispatcher = server.getCommandManager().getDispatcher();
+            boolean success = false;
+            
             try {
                 // Формат: player NAME spawn at X Y Z facing YAW PITCH in DIMENSION in GAMEMODE
-                // Используем Locale.US для точки вместо запятой в числах
                 String command = String.format(java.util.Locale.US,
                     "player %s spawn at %.2f %.2f %.2f facing %.2f %.2f in %s in %s",
                     name, data.x, data.y, data.z, data.yaw, data.pitch, data.dimension, data.gamemode
                 );
-                System.out.println("[PVP_BOT] Trying command: " + command);
+                if (retryCount == 0) {
+                    System.out.println("[PVP_BOT] Restoring bot: " + name);
+                } else {
+                    System.out.println("[PVP_BOT] Retry #" + retryCount + " for bot: " + name);
+                }
                 dispatcher.execute(command, server.getCommandSource());
                 bots.add(name);
                 botDataMap.put(name, data);
-                System.out.println("[PVP_BOT] Successfully restored bot: " + name);
+                success = true;
+                System.out.println("[PVP_BOT] ✓ Successfully restored bot: " + name);
             } catch (Exception e) {
-                System.out.println("[PVP_BOT] First attempt failed: " + e.getMessage());
                 // Пробуем упрощённую команду
                 try {
                     String simpleCommand = String.format(java.util.Locale.US,
                         "player %s spawn at %.2f %.2f %.2f",
                         name, data.x, data.y, data.z
                     );
-                    System.out.println("[PVP_BOT] Trying simple command: " + simpleCommand);
                     dispatcher.execute(simpleCommand, server.getCommandSource());
                     bots.add(name);
                     botDataMap.put(name, data);
-                    System.out.println("[PVP_BOT] Successfully restored bot with simple command: " + name);
+                    success = true;
+                    System.out.println("[PVP_BOT] ✓ Restored bot with simple command: " + name);
                 } catch (Exception e2) {
-                    System.out.println("[PVP_BOT] Failed to restore bot: " + name);
-                    System.out.println("[PVP_BOT] Error: " + e2.getMessage());
-                    e2.printStackTrace();
+                    if (retryCount < MAX_RETRIES) {
+                        System.out.println("[PVP_BOT] ⚠ Failed to restore bot '" + name + "', will retry... (" + (retryCount + 1) + "/" + MAX_RETRIES + ")");
+                    } else {
+                        System.out.println("[PVP_BOT] ✗ Failed to restore bot '" + name + "' after " + (MAX_RETRIES + 1) + " attempts: " + e2.getMessage());
+                    }
                 }
             }
             
-            // Следующий бот через 10 тиков
-            final int nextIndex = index + 1;
-            server.execute(() -> {
-                final int[] delay = {0};
-                server.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        delay[0]++;
-                        if (delay[0] < 10) {
-                            server.execute(this);
-                        } else {
-                            restoreBotsDelayed(server, botsToRestore, nextIndex);
+            // Если не удалось и есть попытки - повторяем через 20 тиков
+            if (!success && retryCount < MAX_RETRIES) {
+                final int currentRetry = retryCount + 1;
+                server.execute(() -> {
+                    final int[] delay = {0};
+                    server.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            delay[0]++;
+                            if (delay[0] < 20) { // 20 тиков = 1 секунда
+                                server.execute(this);
+                            } else {
+                                restoreBotsDelayedWithRetry(server, botsToRestore, index, currentRetry);
+                            }
                         }
-                    }
+                    });
                 });
-            });
+            } else {
+                // Переходим к следующему боту через 10 тиков
+                final int nextIndex = index + 1;
+                server.execute(() -> {
+                    final int[] delay = {0};
+                    server.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            delay[0]++;
+                            if (delay[0] < 10) {
+                                server.execute(this);
+                            } else {
+                                restoreBotsDelayedWithRetry(server, botsToRestore, nextIndex, 0);
+                            }
+                        }
+                    });
+                });
+            }
         }
     }
     

@@ -13,6 +13,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import org.stepan1411.pvp_bot.bot.BotCombat;
+import org.stepan1411.pvp_bot.bot.BotDebug;
 import org.stepan1411.pvp_bot.bot.BotFaction;
 import org.stepan1411.pvp_bot.bot.BotKits;
 import org.stepan1411.pvp_bot.bot.BotManager;
@@ -95,6 +96,58 @@ public class BotCommand {
                     .then(CommandManager.argument("name", StringArgumentType.word())
                         .suggests(PLAYER_SUGGESTIONS)
                         .executes(ctx -> syncBot(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
+                    )
+                )
+                
+                // /pvpbot debug - система отладки
+                .then(CommandManager.literal("debug")
+                    .then(CommandManager.argument("bot", StringArgumentType.word())
+                        .suggests(BOT_SUGGESTIONS)
+                        
+                        // /pvpbot debug <bot> path [true/false]
+                        .then(CommandManager.literal("path")
+                            .executes(ctx -> toggleDebugPath(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
+                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> setDebugPath(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
+                            )
+                        )
+                        
+                        // /pvpbot debug <bot> target [true/false]
+                        .then(CommandManager.literal("target")
+                            .executes(ctx -> toggleDebugTarget(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
+                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> setDebugTarget(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
+                            )
+                        )
+                        
+                        // /pvpbot debug <bot> combat [true/false]
+                        .then(CommandManager.literal("combat")
+                            .executes(ctx -> toggleDebugCombat(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
+                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> setDebugCombat(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
+                            )
+                        )
+                        
+                        // /pvpbot debug <bot> navigation [true/false]
+                        .then(CommandManager.literal("navigation")
+                            .executes(ctx -> toggleDebugNavigation(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
+                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> setDebugNavigation(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
+                            )
+                        )
+                        
+                        // /pvpbot debug <bot> all [true/false]
+                        .then(CommandManager.literal("all")
+                            .executes(ctx -> toggleDebugAll(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
+                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> setDebugAll(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
+                            )
+                        )
+                        
+                        // /pvpbot debug <bot> status
+                        .then(CommandManager.literal("status")
+                            .executes(ctx -> showDebugStatus(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
+                        )
                     )
                 )
                 
@@ -768,11 +821,19 @@ public class BotCommand {
 
 
     private static int spawnBot(ServerCommandSource source, String name) {
-        if (BotManager.spawnBot(source.getServer(), name, source)) {
+        // Проверяем существует ли реальный игрок с таким ником
+        var server = source.getServer();
+        var existingPlayer = server.getPlayerManager().getPlayer(name);
+        if (existingPlayer != null && !BotManager.getAllBots().contains(name)) {
+            source.sendError(Text.literal("Cannot create bot '" + name + "': a real player with this name is online!"));
+            return 0;
+        }
+        
+        if (BotManager.spawnBot(server, name, source)) {
             source.sendFeedback(() -> Text.literal("PvP Bot '" + name + "' spawned!"), true);
             return 1;
         } else {
-            source.sendError(Text.literal("Bot '" + name + "' already exists!"));
+            source.sendError(Text.literal("Failed to spawn bot '" + name + "' (bot already exists or name is taken)"));
             return 0;
         }
     }
@@ -1360,5 +1421,95 @@ public class BotCommand {
             source.sendError(Text.literal("Failed to send statistics: " + e.getMessage()));
             return 0;
         }
+    }
+    
+    // ============ Debug Commands ============
+    
+    private static int toggleDebugPath(ServerCommandSource source, String botName) {
+        var settings = BotDebug.getSettings(botName);
+        boolean newValue = !settings.pathVisualization;
+        BotDebug.setPathVisualization(botName, newValue);
+        source.sendFeedback(() -> Text.literal("Path visualization for " + botName + ": " + newValue), true);
+        return newValue ? 1 : 0;
+    }
+    
+    private static int setDebugPath(ServerCommandSource source, String botName, boolean enabled) {
+        BotDebug.setPathVisualization(botName, enabled);
+        source.sendFeedback(() -> Text.literal("Path visualization for " + botName + ": " + enabled), true);
+        return enabled ? 1 : 0;
+    }
+    
+    private static int toggleDebugTarget(ServerCommandSource source, String botName) {
+        var settings = BotDebug.getSettings(botName);
+        boolean newValue = !settings.targetVisualization;
+        BotDebug.setTargetVisualization(botName, newValue);
+        source.sendFeedback(() -> Text.literal("Target visualization for " + botName + ": " + newValue), true);
+        return newValue ? 1 : 0;
+    }
+    
+    private static int setDebugTarget(ServerCommandSource source, String botName, boolean enabled) {
+        BotDebug.setTargetVisualization(botName, enabled);
+        source.sendFeedback(() -> Text.literal("Target visualization for " + botName + ": " + enabled), true);
+        return enabled ? 1 : 0;
+    }
+    
+    private static int toggleDebugCombat(ServerCommandSource source, String botName) {
+        var settings = BotDebug.getSettings(botName);
+        boolean newValue = !settings.combatInfo;
+        BotDebug.setCombatInfo(botName, newValue);
+        source.sendFeedback(() -> Text.literal("Combat info for " + botName + ": " + newValue), true);
+        return newValue ? 1 : 0;
+    }
+    
+    private static int setDebugCombat(ServerCommandSource source, String botName, boolean enabled) {
+        BotDebug.setCombatInfo(botName, enabled);
+        source.sendFeedback(() -> Text.literal("Combat info for " + botName + ": " + enabled), true);
+        return enabled ? 1 : 0;
+    }
+    
+    private static int toggleDebugNavigation(ServerCommandSource source, String botName) {
+        var settings = BotDebug.getSettings(botName);
+        boolean newValue = !settings.navigationInfo;
+        BotDebug.setNavigationInfo(botName, newValue);
+        source.sendFeedback(() -> Text.literal("Navigation info for " + botName + ": " + newValue), true);
+        return newValue ? 1 : 0;
+    }
+    
+    private static int setDebugNavigation(ServerCommandSource source, String botName, boolean enabled) {
+        BotDebug.setNavigationInfo(botName, enabled);
+        source.sendFeedback(() -> Text.literal("Navigation info for " + botName + ": " + enabled), true);
+        return enabled ? 1 : 0;
+    }
+    
+    private static int toggleDebugAll(ServerCommandSource source, String botName) {
+        var settings = BotDebug.getSettings(botName);
+        boolean newValue = !settings.isAnyEnabled();
+        if (newValue) {
+            BotDebug.enableAll(botName);
+        } else {
+            BotDebug.disableAll(botName);
+        }
+        source.sendFeedback(() -> Text.literal("All debug modes for " + botName + ": " + newValue), true);
+        return newValue ? 1 : 0;
+    }
+    
+    private static int setDebugAll(ServerCommandSource source, String botName, boolean enabled) {
+        if (enabled) {
+            BotDebug.enableAll(botName);
+        } else {
+            BotDebug.disableAll(botName);
+        }
+        source.sendFeedback(() -> Text.literal("All debug modes for " + botName + ": " + enabled), true);
+        return enabled ? 1 : 0;
+    }
+    
+    private static int showDebugStatus(ServerCommandSource source, String botName) {
+        var settings = BotDebug.getSettings(botName);
+        source.sendFeedback(() -> Text.literal("=== Debug Status for " + botName + " ==="), false);
+        source.sendFeedback(() -> Text.literal("Path visualization: " + settings.pathVisualization), false);
+        source.sendFeedback(() -> Text.literal("Target visualization: " + settings.targetVisualization), false);
+        source.sendFeedback(() -> Text.literal("Combat info: " + settings.combatInfo), false);
+        source.sendFeedback(() -> Text.literal("Navigation info: " + settings.navigationInfo), false);
+        return 1;
     }
 }

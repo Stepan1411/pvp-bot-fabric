@@ -112,6 +112,12 @@ public class BotCombat {
         Entity target = findTarget(bot, state, settings, server);
         state.target = target;
         
+        // === DEBUG: Показываем хитбокс цели ===
+        if (target != null) {
+            BotDebug.showTargetEntity(bot, target);
+        }
+        // ======================================
+        
         // Обработка размещения паутины (приоритет над всем)
         if (state.isPlacingCobweb && target != null) {
             handleCobwebPlacement(bot, target, state, server);
