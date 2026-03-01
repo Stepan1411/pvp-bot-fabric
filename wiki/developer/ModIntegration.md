@@ -480,10 +480,7 @@ Look for your integration messages in the console.
 
 ## Example Projects
 
-See `test-addon-example/` directory for complete examples:
-
-- `TestAddon.java` - Basic event integration
-- `TestAddonWithFixes.java` - Advanced integration with error handling
+[example mod](https://github.com/Stepan1411/pvpbot-example-mod)
 
 ## Performance Tips
 

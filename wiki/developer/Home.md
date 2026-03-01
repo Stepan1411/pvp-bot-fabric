@@ -1,6 +1,7 @@
 # PVP Bot API - Developer Documentation
 
-## ⚠️ WARNING ⚠️ API is still under development and some things may not work correctly or not work at all.
+## ⚠️ WARNING ⚠️ 
+API is still under development and some things may not work correctly or not work at all.
 
 Welcome to the PVP Bot Fabric API documentation! This API allows you to create addons and extensions for the mod.
 

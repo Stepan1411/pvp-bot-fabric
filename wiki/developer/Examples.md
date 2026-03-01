@@ -1,6 +1,7 @@
 # Examples
 
 Ready-to-use examples of PVP Bot API usage.
+Or use [example mod](https://github.com/Stepan1411/pvpbot-example-mod)
 
 ## Example 1: Bot Action Logger
 

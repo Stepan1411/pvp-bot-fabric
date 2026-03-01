@@ -1,6 +1,7 @@
 # Events
 
 PVP Bot API provides an event system for tracking bot lifecycle.
+Or use [example mod](https://github.com/Stepan1411/pvpbot-example-mod)
 
 ## Registering Handlers
 
