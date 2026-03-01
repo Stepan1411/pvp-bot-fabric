@@ -59,3 +59,26 @@ java {
     }
     withSourcesJar()
 }
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName.get()}"}
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            
+            groupId = project.maven_group
+            artifactId = project.archives_base_name
+            version = project.mod_version
+        }
+    }
+    
+    repositories {
+        // Для локальной публикации
+        mavenLocal()
+    }
+}

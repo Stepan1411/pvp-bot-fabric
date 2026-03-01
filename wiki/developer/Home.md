@@ -39,6 +39,7 @@ Welcome to the PVP Bot Fabric API documentation! This API allows you to create a
 ## 📦 Installation
 
 Add dependency to your `build.gradle`:
+[![](https://jitpack.io/v/Stepan1411/pvp-bot-fabric.svg)](https://jitpack.io/#Stepan1411/pvp-bot-fabric)
 
 ```gradle
 repositories {
