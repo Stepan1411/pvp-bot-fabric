@@ -80,7 +80,7 @@ public class MyAddon implements ModInitializer {
 
 ## Next Steps
 
-- [Events](Events.md) - learn about all available events
-- [Combat Strategies](CombatStrategies.md) - create custom combat logic
-- [API Reference](APIReference.md) - complete API documentation
-- [Examples](Examples.md) - ready-to-use code examples
+- [Events] - learn about all available events
+- [Combat Strategies] - create custom combat logic
+- [API Reference] - complete API documentation
+- [Examples] - ready-to-use code examples

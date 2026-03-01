@@ -18,15 +18,14 @@ Yes, the API works on both client and server.
 
 ### How do I start developing an addon?
 
-1. Read [Quick Start](QuickStart.md)
-2. Study [Examples](Examples.md)
+1. Read [Quick Start]
+2. Study [Examples]
 3. Create your first event handler
 
 ### Where can I find code examples?
 
-- [Examples](Examples.md) in documentation
+- [Examples] in documentation
 - [GitHub repository](https://github.com/Stepan1411/pvp-bot-fabric)
-- Mod source code
 
 ### How do I debug my addon?
 
@@ -123,7 +122,7 @@ API is optimized for hundreds of bots. Limit depends on your code.
 
 ### Does the API work with other mods?
 
-Yes! See [Mod Integration](Integration.md) for examples.
+Yes! See [Mod Integration] for examples.
 
 ### What if my mod conflicts with another?
 
@@ -235,7 +234,6 @@ Recommended to use MIT or Apache 2.0 for compatibility.
 ### Where can I get help?
 
 - [GitHub Issues](https://github.com/Stepan1411/pvp-bot-fabric/issues)
-- Documentation in wiki
 
 ### How do I report a bug?
 
@@ -262,12 +260,3 @@ See LICENSE file in repository.
 ### Can I use the API in commercial projects?
 
 Yes, if allowed by the license.
-
-### Do I need to credit the API?
-
-Recommended to mention in your addon README:
-
-```markdown
-## Credits
-- PVP Bot Fabric API by Stepan1411
-```

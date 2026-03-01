@@ -1,20 +1,20 @@
 # PVP Bot API - Developer Documentation
 
-Welcome to the PVP Bot Fabric API documentation! This API allows you to create addons and extensions for the mod.
+## ⚠️ WARNING ⚠️ API is still under development and some things may not work correctly or not work at all.
 
-📑 [Full Documentation Index](INDEX.md) - quick access to all sections
+Welcome to the PVP Bot Fabric API documentation! This API allows you to create addons and extensions for the mod.
 
 ## 📚 Contents
 
-- [Quick Start](QuickStart.md) - start here
-- [API Structure](APIStructure.md) - architecture overview
-- [API Reference](APIReference.md) - complete method documentation
-- [Events](Events.md) - event system
-- [Combat Strategies](CombatStrategies.md) - custom combat logic
-- [Examples](Examples.md) - ready-to-use code examples
-- [Mod Integration](Integration.md) - working with other mods
-- [Best Practices](BestPractices.md) - recommendations
-- [FAQ](FAQ.md) - frequently asked questions
+- [🚀 Quick Start] - start here
+- [🏗️API Structure] - architecture overview
+- [📖API Reference] - complete method documentation
+- [⚡Events] - event system
+- [⚔️ Combat Strategies] - custom combat logic
+- [💡Examples] - ready-to-use code examples
+- [🔌Mod Integration] - working with other mods
+- [✨Best Practices] - recommendations
+- [❓FAQ] - frequently asked questions
 
 ## 🎯 API Features
 
@@ -82,7 +82,7 @@ public class MyAddon implements ModInitializer {
 
 ## 📝 API Version
 
-Current API version: **1.0.0**
+Current API version: [![](https://jitpack.io/v/Stepan1411/pvp-bot-fabric.svg)](https://jitpack.io/#Stepan1411/pvp-bot-fabric)
 
 Check version programmatically:
 ```java

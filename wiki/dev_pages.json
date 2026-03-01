@@ -14,6 +14,45 @@
       }
     },
     {
+      "id": "QuickStart",
+      "icon": "🚀",
+      "file": "QuickStart.md",
+      "translations": {
+        "en": "QuickStart",
+        "ru": "Ивенты",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
+      "id": "APIStructure",
+      "icon": "🏗️",
+      "file": "APIStructure.md",
+      "translations": {
+        "en": "API Structure",
+        "ru": "",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
+      "id": "APIReference",
+      "icon": "📖",
+      "file": "APIReference.md",
+      "translations": {
+        "en": "API Reference",
+        "ru": "",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
       "id": "Events",
       "icon": "🎮",
       "file": "Events.md",
@@ -24,6 +63,71 @@
         "fr": "",
         "es": "",
         "de": ""
+      }
+    },
+    {
+      "id": "CombatStrategies",
+      "icon": "⚔️",
+      "file": "CombatStrategies.md",
+      "translations": {
+        "en": "Combat Strategies",
+        "ru": "Стратегии боя",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
+      "id": "Examples",
+      "icon": "💡",
+      "file": "Examples.md",
+      "translations": {
+        "en": "Examples",
+        "ru": "Примеры",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
+      "id": "ModIntegration",
+      "icon": "🔌",
+      "file": "ModIntegration.md",
+      "translations": {
+        "en": "Mod Integration",
+        "ru": "",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
+      "id": "BestPractices",
+      "icon": "✨",
+      "file": "BestPractices.md",
+      "translations": {
+        "en": "Best Practices",
+        "ru": "",
+        "zh": "",
+        "fr": "",
+        "es": "",
+        "de": ""
+      }
+    },
+    {
+      "id": "FAQ",
+      "icon": "❓",
+      "file": "FAQ.md",
+      "translations": {
+        "en": "FAQ",
+        "ru": "FAQ",
+        "zh": "FAQ",
+        "fr": "FAQ",
+        "es": "FAQ",
+        "de": "FAQ"
       }
     }
   ]
