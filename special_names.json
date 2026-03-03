@@ -3,7 +3,9 @@
   "special_names": [
     "nantag",
     "ryy21",
-    "Majklosonek"
+    "Majklosonek",
+    "NemphiGamingYT",
+    "plennikSeraf"
   ],
   "spawn_chance": 10,
   "description": "Special names for PVP Bot mod. These names have a chance to be used when spawning bots with random names."
