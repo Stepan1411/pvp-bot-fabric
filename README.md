@@ -7,6 +7,8 @@
 
 This mod adds bots to the server with advanced combat AI, a faction system, automatic equipment, and navigation. Bots can fight players, mobs, and each other, using a variety of weapons and tactics.
 
+# [![github](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/github_64h.png)](https://github.com/Stepan1411/pvp-bot-fabric) [![jitpack](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/jitpack_64h.png) ](https://jitpack.io/#Stepan1411/pvp-bot-fabric)[![modrinth](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/modrinth_64h.png) ](https://modrinth.com/mod/pvp-bot-fabric)[![ghpages](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/documentation/ghpages_64h.png)](https://stepan1411.github.io/pvpbot-docs.html)
+
 ---
 
 ## 🔌 Developer API
