@@ -61,7 +61,8 @@ public class BotCombat {
             MACE,
             SPEAR,
             CRYSTAL,
-            ANCHOR
+            ANCHOR,
+            ELYTRA_MACE // Новый режим
         }
     }
     
@@ -297,6 +298,7 @@ public class BotCombat {
             case SPEAR -> settings.getSpearChargeRange();
             case CRYSTAL -> 10.0;
             case ANCHOR -> 10.0;
+            case ELYTRA_MACE -> 15.0; // Новый режим
         };
         
         if (distance > maxRange) {
@@ -312,19 +314,23 @@ public class BotCombat {
             case MACE -> handleMaceCombat(bot, target, state, distance, settings, server);
             case SPEAR -> handleSpearCombat(bot, target, state, distance, settings, server);
             case CRYSTAL -> {
-
                 boolean handled = BotCrystalPvp.doCrystalPvp(bot, target, settings, server);
                 if (!handled) {
-
                     state.currentMode = CombatState.WeaponMode.MELEE;
                     handleMeleeCombat(bot, target, state, distance, settings, server);
                 }
             }
             case ANCHOR -> {
-
                 boolean handled = BotAnchorPvp.doAnchorPvp(bot, target, settings, server);
                 if (!handled) {
-
+                    state.currentMode = CombatState.WeaponMode.MELEE;
+                    handleMeleeCombat(bot, target, state, distance, settings, server);
+                }
+            }
+            case ELYTRA_MACE -> {
+                // Новый режим ElytraMace
+                boolean handled = BotElytraMace.doElytraMace(bot, target, settings, server);
+                if (!handled) {
                     state.currentMode = CombatState.WeaponMode.MELEE;
                     handleMeleeCombat(bot, target, state, distance, settings, server);
                 }
@@ -536,33 +542,37 @@ public class BotCombat {
         double maceRange = settings.getMaceRange();
         double spearRange = settings.getSpearRange();
         
-
-
-        if (target != null && BotCrystalPvp.canUseCrystalPvp(bot, target, settings)) {
+        // Приоритет: ElytraMace > Crystal > Anchor > остальные
+        if (target != null && BotElytraMace.canUseElytraMace(bot, target, settings)) {
+            state.currentMode = CombatState.WeaponMode.ELYTRA_MACE;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected ELYTRA_MACE mode");
+        } else if (target != null && BotCrystalPvp.canUseCrystalPvp(bot, target, settings)) {
             state.currentMode = CombatState.WeaponMode.CRYSTAL;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected CRYSTAL mode");
         } else if (target != null && BotAnchorPvp.canUseAnchorPvp(bot, target, settings)) {
-
             state.currentMode = CombatState.WeaponMode.ANCHOR;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected ANCHOR mode");
         } else if (hasMace && distance <= maceRange && settings.isMaceEnabled()) {
-
             state.currentMode = CombatState.WeaponMode.MACE;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected MACE mode");
         } else if (hasSpear && distance <= spearRange && settings.isSpearEnabled()) {
-
             state.currentMode = CombatState.WeaponMode.SPEAR;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected SPEAR mode");
         } else if (hasRanged && distance > rangedMinRange && settings.isRangedEnabled()) {
-
             state.currentMode = CombatState.WeaponMode.RANGED;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected RANGED mode");
         } else if (hasMelee && distance <= meleeRange * 2) {
-
             state.currentMode = CombatState.WeaponMode.MELEE;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected MELEE mode");
         } else if (hasSpear && settings.isSpearEnabled()) {
-
             state.currentMode = CombatState.WeaponMode.SPEAR;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected SPEAR mode (fallback)");
         } else if (hasRanged && settings.isRangedEnabled()) {
-
             state.currentMode = CombatState.WeaponMode.RANGED;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected RANGED mode (fallback)");
         } else {
             state.currentMode = CombatState.WeaponMode.MELEE;
+            System.out.println("[COMBAT] " + bot.getName().getString() + " selected MELEE mode (default)");
         }
     }
     

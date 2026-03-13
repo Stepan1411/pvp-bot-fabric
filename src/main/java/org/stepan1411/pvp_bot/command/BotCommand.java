@@ -353,6 +353,16 @@ public class BotCommand {
                             })
                         )
                     )
+                    .then(CommandManager.literal("elytramace")
+                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("elytramace: " + BotSettings.get().isElytraMaceEnabled()), false); return 1; })
+                        .then(CommandManager.argument("value", BoolArgumentType.bool())
+                            .executes(ctx -> {
+                                BotSettings.get().setElytraMaceEnabled(BoolArgumentType.getBool(ctx, "value"));
+                                ctx.getSource().sendFeedback(() -> Text.literal("ElytraMace trick: " + BotSettings.get().isElytraMaceEnabled()), true);
+                                return 1;
+                            })
+                        )
+                    )
                     .then(CommandManager.literal("attackcooldown")
                         .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("attackcooldown: " + BotSettings.get().getAttackCooldown() + " ticks"), false); return 1; })
                         .then(CommandManager.argument("ticks", IntegerArgumentType.integer(1, 40))
@@ -1169,6 +1179,7 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("criticals: " + s.isCriticalsEnabled()), false);
         source.sendFeedback(() -> Text.literal("ranged: " + s.isRangedEnabled()), false);
         source.sendFeedback(() -> Text.literal("mace: " + s.isMaceEnabled()), false);
+        source.sendFeedback(() -> Text.literal("elytramace: " + s.isElytraMaceEnabled()), false);
         source.sendFeedback(() -> Text.literal("attackcooldown: " + s.getAttackCooldown() + " ticks"), false);
         source.sendFeedback(() -> Text.literal("meleerange: " + s.getMeleeRange()), false);
         source.sendFeedback(() -> Text.literal("movespeed: " + s.getMoveSpeed()), false);

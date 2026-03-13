@@ -58,6 +58,7 @@ public class BotSettings {
     private boolean spearEnabled = false;
     private boolean crystalPvpEnabled = true;
     private boolean anchorPvpEnabled = true;
+    private boolean elytraMaceEnabled = true; // Новая настройка
     
 
     private double spearRange = 4.5;
@@ -177,6 +178,7 @@ public class BotSettings {
     public boolean isSpearEnabled() { return spearEnabled; }
     public boolean isCrystalPvpEnabled() { return crystalPvpEnabled; }
     public boolean isAnchorPvpEnabled() { return anchorPvpEnabled; }
+    public boolean isElytraMaceEnabled() { return elytraMaceEnabled; } // Новый геттер
     public double getSpearRange() { return spearRange; }
     public double getSpearChargeRange() { return spearChargeRange; }
     public int getSpearMinChargeTime() { return spearMinChargeTime; }
@@ -298,6 +300,7 @@ public class BotSettings {
     public void setSpearEnabled(boolean value) { this.spearEnabled = value; save(); }
     public void setCrystalPvpEnabled(boolean value) { this.crystalPvpEnabled = value; save(); }
     public void setAnchorPvpEnabled(boolean value) { this.anchorPvpEnabled = value; save(); }
+    public void setElytraMaceEnabled(boolean value) { this.elytraMaceEnabled = value; save(); } // Новый сеттер
     public void setSpearRange(double value) { 
         this.spearRange = Math.max(2.0, Math.min(8.0, value)); 
         save(); 

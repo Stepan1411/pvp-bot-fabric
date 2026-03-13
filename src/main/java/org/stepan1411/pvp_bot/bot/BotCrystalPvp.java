@@ -25,6 +25,10 @@ public class BotCrystalPvp {
         int crystalPlaceFailCounter = 0;
         java.util.Set<BlockPos> triedPositions = new java.util.HashSet<>();
         int obsidianPlaceAttempts = 0;
+        
+        // Новые поля для атак мечом
+        boolean swordAttackDone = false; // Была ли атака мечом на текущем шаге
+        int swordAttackCooldown = 0; // Кулдаун между атаками мечом
     }
     
     private static final java.util.Map<String, CrystalState> states = new java.util.HashMap<>();
@@ -60,6 +64,7 @@ public class BotCrystalPvp {
                 state.lastObsidianPos = null;
                 state.cooldownTicks = 0;
                 state.stuckCounter = 0;
+                state.swordAttackDone = false; // Сброс атаки мечом
                 return true;
             }
         } else {
@@ -74,6 +79,11 @@ public class BotCrystalPvp {
 
             maintainDistance(bot, target, settings);
             return true;
+        }
+        
+        // Обрабатываем кулдаун атак мечом
+        if (state.swordAttackCooldown > 0) {
+            state.swordAttackCooldown--;
         }
         
 
@@ -121,6 +131,20 @@ public class BotCrystalPvp {
                                             net.minecraft.server.MinecraftServer server, World world, BotSettings settings) {
         PlayerInventory inventory = bot.getInventory();
         
+        // НОВОЕ: Атака мечом в начале шага 0
+        if (!state.swordAttackDone && state.swordAttackCooldown <= 0) {
+            double distance = bot.distanceTo(target);
+            if (distance <= settings.getMeleeRange() + 1.0) { // Немного больший радиус для атаки
+                System.out.println("[Crystal PVP] " + bot.getName().getString() + " Step 0: Attacking player with sword first");
+                boolean attacked = attackPlayerWithSword(bot, target, state, server, settings);
+                if (attacked) {
+                    state.swordAttackDone = true;
+                    state.swordAttackCooldown = 10; // Кулдаун между атаками мечом
+                    return true;
+                }
+            }
+        }
+        
 
         BlockPos existingObsidian = findExistingObsidian(bot, target, world, 5.0);
         if (existingObsidian != null) {
@@ -133,6 +157,7 @@ public class BotCrystalPvp {
                 state.step = 1;
                 state.cooldownTicks = 0;
                 state.stuckCounter = 0;
+                state.swordAttackDone = false; // Сброс для нового шага
                 return true;
             } else {
 
@@ -210,6 +235,7 @@ public class BotCrystalPvp {
             state.cooldownTicks = 5;
             state.stuckCounter = 0;
             state.obsidianPlaceAttempts = 0;
+            state.swordAttackDone = false; // Сброс для нового шага
             
         } catch (Exception e) {
             System.out.println("[Crystal PVP] " + bot.getName().getString() + " error placing obsidian: " + e.getMessage());
@@ -224,6 +250,20 @@ public class BotCrystalPvp {
     private static boolean stepPlaceCrystal(ServerPlayerEntity bot, Entity target, CrystalState state,
                                            net.minecraft.server.MinecraftServer server, World world, BotSettings settings) {
         PlayerInventory inventory = bot.getInventory();
+        
+        // НОВОЕ: Атака мечом в начале шага 1
+        if (!state.swordAttackDone && state.swordAttackCooldown <= 0) {
+            double distance = bot.distanceTo(target);
+            if (distance <= settings.getMeleeRange() + 1.0) { // Немного больший радиус для атаки
+                System.out.println("[Crystal PVP] " + bot.getName().getString() + " Step 1: Attacking player with sword first");
+                boolean attacked = attackPlayerWithSword(bot, target, state, server, settings);
+                if (attacked) {
+                    state.swordAttackDone = true;
+                    state.swordAttackCooldown = 10; // Кулдаун между атаками мечом
+                    return true;
+                }
+            }
+        }
         
 
         if (state.lastObsidianPos == null) {
@@ -305,6 +345,7 @@ public class BotCrystalPvp {
             state.step = 2;
             state.cooldownTicks = 5;
             state.stuckCounter = 0;
+            state.swordAttackDone = false; // Сброс для нового шага
             
         } catch (Exception e) {
             System.out.println("[Crystal PVP] " + bot.getName().getString() + " error placing crystal: " + e.getMessage());
@@ -357,12 +398,14 @@ public class BotCrystalPvp {
 
                 state.step = 1;
                 state.cooldownTicks = 2;
+                state.swordAttackDone = false; // Сброс для нового шага
                 System.out.println("[Crystal PVP] " + bot.getName().getString() + " moving to step 1 (new crystal)");
             } else {
 
                 state.step = 0;
                 state.lastObsidianPos = null;
                 state.cooldownTicks = 5;
+                state.swordAttackDone = false; // Сброс для нового шага
                 System.out.println("[Crystal PVP] " + bot.getName().getString() + " moving to step 0 (new obsidian)");
             }
             
@@ -383,9 +426,11 @@ public class BotCrystalPvp {
 
             if (state.lastObsidianPos != null) {
                 state.step = 1;
+                state.swordAttackDone = false; // Сброс для нового шага
                 System.out.println("[Crystal PVP] " + bot.getName().getString() + " returning to step 1 (place crystal)");
             } else {
                 state.step = 0;
+                state.swordAttackDone = false; // Сброс для нового шага
                 System.out.println("[Crystal PVP] " + bot.getName().getString() + " returning to step 0 (place obsidian)");
             }
             state.cooldownTicks = 3;
@@ -676,8 +721,65 @@ public class BotCrystalPvp {
         return findEndCrystal(inventory) >= 0;
     }
     
+    /**
+     * Атака игрока мечом в Crystal PvP
+     */
+    private static boolean attackPlayerWithSword(ServerPlayerEntity bot, Entity target, CrystalState state, 
+                                                net.minecraft.server.MinecraftServer server, BotSettings settings) {
+        PlayerInventory inventory = bot.getInventory();
+        double distance = bot.distanceTo(target);
+        
+        // Проверяем дистанцию для атаки мечом
+        if (distance > settings.getMeleeRange()) {
+            // Подходим ближе
+            moveToward(bot, target, settings.getMoveSpeed());
+            return true;
+        }
+        
+        // Находим меч
+        int weaponSlot = findMeleeWeapon(inventory);
+        if (weaponSlot >= 0) {
+            selectItem(bot, weaponSlot);
+        }
+        
+        // Смотрим на цель
+        lookAtEntity(bot, target);
+        
+        // Проверяем кулдаун атаки
+        if (bot.getAttackCooldownProgress(0.5f) < 1.0f) {
+            return true; // Ждем кулдаун
+        }
+        
+        // Атакуем мечом
+        try {
+            server.getCommandManager().getDispatcher().execute(
+                "player " + bot.getName().getString() + " attack once", 
+                server.getCommandSource()
+            );
+            System.out.println("[Crystal PVP] " + bot.getName().getString() + " attacked player with sword!");
+            return true;
+        } catch (Exception e) {
+            System.out.println("[Crystal PVP] " + bot.getName().getString() + " error attacking with sword: " + e.getMessage());
+            bot.swingHand(Hand.MAIN_HAND);
+            return true;
+        }
+    }
+    
     
     public static void reset(String botName) {
-        states.remove(botName);
+        CrystalState state = states.get(botName);
+        if (state != null) {
+            state.step = 0;
+            state.lastObsidianPos = null;
+            state.cooldownTicks = 0;
+            state.stuckCounter = 0;
+            state.lastStep = -1;
+            state.crystalNotFoundCounter = 0;
+            state.crystalPlaceFailCounter = 0;
+            state.triedPositions.clear();
+            state.obsidianPlaceAttempts = 0;
+            state.swordAttackDone = false;
+            state.swordAttackCooldown = 0;
+        }
     }
 }
