@@ -451,6 +451,36 @@ public class BotCommand {
                             })
                         )
                     )
+                    .then(CommandManager.literal("shieldmace")
+                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("shieldmace: " + BotSettings.get().isShieldMace()), false); return 1; })
+                        .then(CommandManager.argument("value", BoolArgumentType.bool())
+                            .executes(ctx -> {
+                                BotSettings.get().setShieldMace(BoolArgumentType.getBool(ctx, "value"));
+                                ctx.getSource().sendFeedback(() -> Text.literal("Shield mace defense: " + BotSettings.get().isShieldMace()), true);
+                                return 1;
+                            })
+                        )
+                    )
+                    .then(CommandManager.literal("prefershieldmace")
+                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("prefershieldmace: " + BotSettings.get().isPreferShieldMace()), false); return 1; })
+                        .then(CommandManager.argument("value", BoolArgumentType.bool())
+                            .executes(ctx -> {
+                                BotSettings.get().setPreferShieldMace(BoolArgumentType.getBool(ctx, "value"));
+                                ctx.getSource().sendFeedback(() -> Text.literal("Prefer shield over totem for mace: " + BotSettings.get().isPreferShieldMace()), true);
+                                return 1;
+                            })
+                        )
+                    )
+                    .then(CommandManager.literal("shieldmainhand")
+                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("shieldmainhand: " + BotSettings.get().isShieldMainHand()), false); return 1; })
+                        .then(CommandManager.argument("value", BoolArgumentType.bool())
+                            .executes(ctx -> {
+                                BotSettings.get().setShieldMainHand(BoolArgumentType.getBool(ctx, "value"));
+                                ctx.getSource().sendFeedback(() -> Text.literal("Shield in main hand when having totem: " + BotSettings.get().isShieldMainHand()), true);
+                                return 1;
+                            })
+                        )
+                    )
                     .then(CommandManager.literal("attackcooldown")
                         .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("attackcooldown: " + BotSettings.get().getAttackCooldown() + " ticks"), false); return 1; })
                         .then(CommandManager.argument("ticks", IntegerArgumentType.integer(1, 40))
@@ -1369,6 +1399,9 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("gotousebaritone: " + s.isGotoUseBaritone()), false);
         source.sendFeedback(() -> Text.literal("escortusebaritone: " + s.isEscortUseBaritone()), false);
         source.sendFeedback(() -> Text.literal("followusebaritone: " + s.isFollowUseBaritone()), false);
+        source.sendFeedback(() -> Text.literal("shieldmace: " + s.isShieldMace()), false);
+        source.sendFeedback(() -> Text.literal("prefershieldmace: " + s.isPreferShieldMace()), false);
+        source.sendFeedback(() -> Text.literal("shieldmainhand: " + s.isShieldMainHand()), false);
         source.sendFeedback(() -> Text.literal("attackcooldown: " + s.getAttackCooldown() + " ticks"), false);
         source.sendFeedback(() -> Text.literal("meleerange: " + s.getMeleeRange()), false);
         source.sendFeedback(() -> Text.literal("movespeed: " + s.getMoveSpeed()), false);

@@ -507,6 +507,12 @@ public class BotUtils {
         }
         
         var combatState = BotCombat.getState(bot.getName().getString());
+        
+
+        if (combatState.isMaceDefending) {
+            return;
+        }
+        
         var target = combatState.target;
         
         if (target == null || state.shieldCooldown > 0) {

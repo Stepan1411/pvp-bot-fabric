@@ -85,6 +85,9 @@ public class BotSettings {
     private boolean gotoUseBaritone = true;
     private boolean escortUseBaritone = false;
     private boolean followUseBaritone = false;
+    private boolean shieldMace = true;
+    private boolean preferShieldMace = false;
+    private boolean shieldMainHand = true;
     
     private BotSettings() {}
     
@@ -215,6 +218,9 @@ public class BotSettings {
     public boolean isGotoUseBaritone() { return gotoUseBaritone; }
     public boolean isEscortUseBaritone() { return escortUseBaritone; }
     public boolean isFollowUseBaritone() { return followUseBaritone; }
+    public boolean isShieldMace() { return shieldMace; }
+    public boolean isPreferShieldMace() { return preferShieldMace; }
+    public boolean isShieldMainHand() { return shieldMainHand; }
     
 
     public void setAutoEquipArmor(boolean value) { 
@@ -412,6 +418,21 @@ public class BotSettings {
     
     public void setFollowUseBaritone(boolean value) { 
         this.followUseBaritone = value; 
+        save(); 
+    }
+    
+    public void setShieldMace(boolean value) { 
+        this.shieldMace = value; 
+        save(); 
+    }
+    
+    public void setPreferShieldMace(boolean value) { 
+        this.preferShieldMace = value; 
+        save(); 
+    }
+    
+    public void setShieldMainHand(boolean value) { 
+        this.shieldMainHand = value; 
         save(); 
     }
 }

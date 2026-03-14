@@ -12,7 +12,7 @@ import java.util.Set;
 
 public class PvpBotAPI {
     
-    private static final String API_VERSION = "1.0.0";
+    private static final String API_VERSION = "2.0.0";
     
     
     public static String getApiVersion() {

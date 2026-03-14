@@ -43,15 +43,7 @@ public class BotAPIIntegration {
         }
     }
     
-    /**
-     * Fire a bot damage event.
-     * Called internally when a bot is about to take damage.
-     * 
-     * @param bot the bot taking damage
-     * @param attacker the entity causing damage (can be null)
-     * @param damage the amount of damage
-     * @return true if the damage should be cancelled, false otherwise
-     */
+    
     public static boolean fireDamageEvent(ServerPlayerEntity bot, Entity attacker, float damage) {
         if (bot == null) return false;
         
@@ -78,22 +70,12 @@ public class BotAPIIntegration {
         }
     }
     
-    /**
-     * Check if a bot name is valid for API operations.
-     * 
-     * @param botName the bot name to check
-     * @return true if valid, false otherwise
-     */
+    
     public static boolean isValidBotName(String botName) {
         return botName != null && !botName.isEmpty() && botName.length() <= 16;
     }
     
-    /**
-     * Safely get a bot's name for logging.
-     * 
-     * @param bot the bot entity
-     * @return bot name or "Unknown" if null
-     */
+    
     public static String getBotNameSafe(ServerPlayerEntity bot) {
         if (bot == null) return "Unknown";
         try {

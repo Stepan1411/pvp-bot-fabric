@@ -42,8 +42,6 @@ public class BotElytraMace {
     
     
     public static boolean canUseElytraMace(ServerPlayerEntity bot, Entity target, BotSettings settings) {
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " checking canUseElytraMace...");
-        
         if (!settings.isElytraMaceEnabled()) {
             return false;
         }
@@ -56,19 +54,6 @@ public class BotElytraMace {
         PlayerInventory inventory = bot.getInventory();
         boolean hasAllItems = hasElytra(inventory) && hasMace(inventory) && hasFireworks(inventory) && hasChestplate(inventory);
         
-
-        if (!hasAllItems) {
-            int elytraSlot = findElytra(inventory);
-            int chestSlot = findChestplate(inventory);
-            String elytraInfo = elytraSlot == 38 ? "equipped" : (elytraSlot >= 0 ? "slot " + elytraSlot : "none");
-            String chestInfo = chestSlot == 38 ? "equipped" : (chestSlot >= 0 ? "slot " + chestSlot : "none");
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " missing items - Elytra: " + hasElytra(inventory) + " (" + elytraInfo + ")" +
-                             ", Mace: " + hasMace(inventory) + ", Fireworks: " + hasFireworks(inventory) + 
-                             ", Chestplate: " + hasChestplate(inventory) + " (" + chestInfo + ")");
-        } else {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " can use ElytraMace! Distance: " + String.format("%.1f", distance));
-        }
-        
         return hasAllItems;
     }
     
@@ -78,23 +63,10 @@ public class BotElytraMace {
         World world = bot.getEntityWorld();
         double distance = bot.distanceTo(target);
         
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " doElytraMace called - step: " + state.step + ", distance: " + String.format("%.1f", distance));
-        
-
-        if (state.step == 0 && state.cooldownTicks == 0) {
-            PlayerInventory inventory = bot.getInventory();
-            int elytraSlot = findElytra(inventory);
-            int chestSlot = findChestplate(inventory);
-            String elytraInfo = elytraSlot == 38 ? "equipped" : (elytraSlot >= 0 ? "slot " + elytraSlot : "none");
-            String chestInfo = chestSlot == 38 ? "equipped" : (chestSlot >= 0 ? "slot " + chestSlot : "none");
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " starting new cycle - Elytra: " + elytraInfo + ", Chestplate: " + chestInfo);
-        }
-        
 
         if (state.step == state.lastStep) {
             state.stuckCounter++;
             if (state.stuckCounter > 100) {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " STUCK on step " + state.step + "! Resetting state.");
                 resetState(state);
                 return true;
             }
@@ -116,7 +88,6 @@ public class BotElytraMace {
         
 
         if (distance > 20.0) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " target too far, resetting");
             resetState(state);
             return true;
         }
@@ -146,29 +117,20 @@ public class BotElytraMace {
                                            net.minecraft.server.MinecraftServer server, World world, BotSettings settings) {
         PlayerInventory inventory = bot.getInventory();
         
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " step 0: preparing elytra...");
-        
 
         state.elytraSlot = findElytra(inventory);
         state.chestplateSlot = findChestplate(inventory);
         state.fireworkSlot = findFireworks(inventory);
         state.maceSlot = findMace(inventory);
         
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " found items - Elytra: " + state.elytraSlot + ", Chestplate: " + state.chestplateSlot + ", Fireworks: " + state.fireworkSlot + ", Mace: " + state.maceSlot);
-        
         if (state.elytraSlot < 0 || state.fireworkSlot < 0 || state.maceSlot < 0) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " missing required items!");
             return false;
         }
         
 
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " selecting elytra from slot " + state.elytraSlot);
         if (!selectItem(bot, state.elytraSlot)) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " failed to select elytra");
             return true;
         }
-        
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " equipping elytra...");
         
 
         try {
@@ -180,10 +142,9 @@ public class BotElytraMace {
             state.elytraEquipped = true;
             state.step = 1;
             state.cooldownTicks = 5;
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " elytra equipped, moving to step 1");
             
         } catch (Exception e) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " error equipping elytra: " + e.getMessage());
+
         }
         
         return true;
@@ -197,37 +158,26 @@ public class BotElytraMace {
 
         if (state.takeoffTicks == 0) {
             state.startY = bot.getY();
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " starting takeoff sequence at Y=" + String.format("%.1f", state.startY) + "...");
         }
         
         state.takeoffTicks++;
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " takeoff tick " + state.takeoffTicks);
         
 
         if (state.takeoffTicks == 1) {
-
             bot.setPitch(0.0f);
-            
-
             bot.jump();
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " jumping with horizontal look (direct call)...");
         }
         
 
         if (state.takeoffTicks == 5) {
-
             bot.jump();
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " activating elytra with direct jump...");
         }
         
 
         if (state.takeoffTicks == 8) {
-
             if (!selectItem(bot, state.fireworkSlot)) {
                 return true;
             }
-            
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " launching with fireworks...");
             
 
             int fireworkCount = settings.getElytraMaceFireworkCount();
@@ -238,22 +188,16 @@ public class BotElytraMace {
                         server.getCommandSource()
                     );
                 }
-                
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " launched " + fireworkCount + " fireworks");
-                
             } catch (Exception e) {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " error launching fireworks: " + e.getMessage());
+
             }
         }
         
 
         if (state.takeoffTicks == 12) {
             bot.setPitch(-90.0f);
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " looking up for altitude gain");
-            
             state.step = 2;
             state.cooldownTicks = 3;
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " moving to step 2");
         }
         
         return true;
@@ -266,11 +210,8 @@ public class BotElytraMace {
         double currentHeight = bot.getY() - state.startY;
         int minAltitude = settings.getElytraMaceMinAltitude();
         
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " altitude: " + String.format("%.1f", currentHeight) + " blocks (tick " + state.takeoffTicks + ")");
-        
 
         if (currentHeight >= minAltitude) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " reached altitude " + String.format("%.1f", currentHeight) + ", moving to step 3");
             state.step = 3;
             state.cooldownTicks = 0;
             return true;
@@ -282,14 +223,11 @@ public class BotElytraMace {
             int maxRetries = settings.getElytraMaceMaxRetries();
             
             if (state.retryCount < maxRetries) {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " takeoff failed (altitude: " + String.format("%.1f", currentHeight) + "), retry " + state.retryCount + "/" + maxRetries);
-
                 state.step = 0;
                 state.takeoffTicks = 0;
                 state.elytraEquipped = false;
                 state.cooldownTicks = 10;
             } else {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " takeoff failed after " + maxRetries + " attempts, giving up");
                 resetState(state);
                 return false;
             }
@@ -305,14 +243,11 @@ public class BotElytraMace {
         
 
         if (state.chestplateSlot >= 0) {
-
             if (state.chestplateSlot != 38) {
                 if (!selectItem(bot, state.chestplateSlot)) {
                     return true;
                 }
             }
-            
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " equipping chestplate...");
             
 
             try {
@@ -321,18 +256,13 @@ public class BotElytraMace {
                     server.getCommandSource()
                 );
             } catch (Exception e) {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " error equipping chestplate: " + e.getMessage());
+
             }
-        } else {
-
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " no chestplate, removing elytra manually...");
-
         }
         
         state.elytraEquipped = false;
         state.waitTicks = 5;
         state.step = 4;
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " elytra removed, waiting 5 ticks");
         
         return true;
     }
@@ -349,8 +279,6 @@ public class BotElytraMace {
                 return true;
             }
             
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " re-equipping elytra for glide...");
-            
             try {
                 server.getCommandManager().getDispatcher().execute(
                     "player " + bot.getName().getString() + " use once", 
@@ -358,7 +286,7 @@ public class BotElytraMace {
                 );
                 state.elytraEquipped = true;
             } catch (Exception e) {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " error re-equipping elytra: " + e.getMessage());
+
             }
             return true;
         }
@@ -374,16 +302,12 @@ public class BotElytraMace {
         
 
         float targetPitch = (float) Math.toDegrees(Math.atan2(deltaY, horizontalDistance));
-
         targetPitch = Math.max(30.0f, Math.min(90.0f, targetPitch));
         bot.setPitch(targetPitch);
-        
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " gliding to target, distance: " + String.format("%.1f", distance) + ", pitch: " + String.format("%.1f", targetPitch));
         
 
         double attackDistance = settings.getElytraMaceAttackDistance();
         if (distance <= attackDistance) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " close to target (" + String.format("%.1f", distance) + "), moving to step 5");
             state.step = 5;
             state.cooldownTicks = 0;
         }
@@ -398,9 +322,6 @@ public class BotElytraMace {
         
 
         if (state.elytraEquipped && state.chestplateSlot >= 0) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " removing elytra, chestplate slot: " + state.chestplateSlot);
-            
-
             if (state.chestplateSlot != 38) {
                 if (!selectItem(bot, state.chestplateSlot)) {
                     return true;
@@ -413,13 +334,8 @@ public class BotElytraMace {
                     server.getCommandSource()
                 );
                 state.elytraEquipped = false;
-                
-
-                int elytraSlot = findElytra(inventory);
-                String elytraInfo = elytraSlot == 38 ? "still equipped" : (elytraSlot >= 0 ? "moved to slot " + elytraSlot : "disappeared");
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " elytra removed for mace attack, elytra now: " + elytraInfo);
             } catch (Exception e) {
-                System.out.println("[ElytraMace] " + bot.getName().getString() + " error removing elytra: " + e.getMessage());
+
             }
             return true;
         }
@@ -433,15 +349,12 @@ public class BotElytraMace {
         lookAtEntity(bot, target);
         
 
-        System.out.println("[ElytraMace] " + bot.getName().getString() + " attacking with mace!");
-        
         try {
             server.getCommandManager().getDispatcher().execute(
                 "player " + bot.getName().getString() + " attack once", 
                 server.getCommandSource()
             );
         } catch (Exception e) {
-            System.out.println("[ElytraMace] " + bot.getName().getString() + " error attacking with mace: " + e.getMessage());
             bot.swingHand(Hand.MAIN_HAND);
         }
         

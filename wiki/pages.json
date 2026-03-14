@@ -92,19 +92,6 @@
       }
     },
     {
-      "id": "elytramace",
-      "icon": "🚀",
-      "file": "ElytraMace.md",
-      "translations": {
-        "en": "ElytraMace",
-        "ru": "ЭлитраБулава",
-        "zh": "鞘翅锤",
-        "fr": "ElytraMasse",
-        "es": "ElytraMaza",
-        "de": "ElytraStreitkolben"
-      }
-    },
-    {
       "id": "paths",
       "icon": "🛤",
       "file": "Paths.md",
