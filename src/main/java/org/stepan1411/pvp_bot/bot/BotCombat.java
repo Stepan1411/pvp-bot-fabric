@@ -58,6 +58,13 @@ public class BotCombat {
 
         public boolean isMaceDefending = false;
         public int maceDefenseCooldown = 0;
+
+        public int enemyCooldown = 0;
+        public double lastEnemyDist = 99;
+        public int shieldFlickerTicks = 0;
+        public int shieldPredictTicks = 0;
+        public int shieldHoldTicks = 0;
+        public int shieldHitTicks = 0;
         
         public enum WeaponMode {
             MELEE,
@@ -65,8 +72,7 @@ public class BotCombat {
             MACE,
             SPEAR,
             CRYSTAL,
-            ANCHOR,
-            ELYTRA_MACE
+            ANCHOR
         }
     }
     
@@ -115,10 +121,6 @@ public class BotCombat {
         Entity target = findTarget(bot, state, settings, server);
         state.target = target;
         
-
-        if (target != null) {
-            BotDebug.showTargetEntity(bot, target);
-        }
 
         
 
@@ -249,20 +251,7 @@ public class BotCombat {
         if (utilsState.isMending) {
             return;
         }
-        
 
-
-        try {
-            var strategyRegistry = org.stepan1411.pvp_bot.api.combat.CombatStrategyRegistry.getInstance();
-            boolean strategyExecuted = strategyRegistry.executeStrategy(bot, target, settings, server);
-            if (strategyExecuted) {
-
-                return;
-            }
-        } catch (Exception e) {
-            System.err.println("[PVP_BOT] Error executing combat strategy: " + e.getMessage());
-            e.printStackTrace();
-        }
 
 
 
@@ -271,20 +260,6 @@ public class BotCombat {
 
 
         boolean shouldLookAt = !utilsState.isThrowingPotion;
-        
-        if (shouldLookAt && settings.isUseBaritone()) {
-
-            var mainHandStack = bot.getMainHandStack();
-            boolean usingMace = mainHandStack.getItem().toString().toLowerCase().contains("mace");
-            
-            if (usingMace) {
-
-                shouldLookAt = !bot.isOnGround() || distance <= 5.0;
-            } else {
-
-                shouldLookAt = distance <= 3.5;
-            }
-        }
         
         if (shouldLookAt) {
             BotNavigation.lookAt(bot, target);
@@ -298,7 +273,6 @@ public class BotCombat {
             case SPEAR -> settings.getSpearChargeRange();
             case CRYSTAL -> 10.0;
             case ANCHOR -> 10.0;
-            case ELYTRA_MACE -> 15.0;
         };
         
         if (distance > maxRange) {
@@ -330,14 +304,6 @@ public class BotCombat {
                     handleMeleeCombat(bot, target, state, distance, settings, server);
                 }
             }
-            case ELYTRA_MACE -> {
-
-                boolean handled = BotElytraMace.doElytraMace(bot, target, settings, server);
-                if (!handled) {
-                    state.currentMode = CombatState.WeaponMode.MELEE;
-                    handleMeleeCombat(bot, target, state, distance, settings, server);
-                }
-            }
         }
     }
     
@@ -347,9 +313,13 @@ public class BotCombat {
         if (state.forcedTargetName != null) {
             Entity forced = findEntityByName(bot, state.forcedTargetName, server);
             if (forced != null && forced.isAlive()) {
-                double dist = bot.distanceTo(forced);
-                if (dist <= settings.getMaxTargetDistance()) {
-                    return forced;
+                if (forced instanceof PlayerEntity player && !settings.isAttackInvincible() && (player.isSpectator() || player.isCreative() || player.isInvulnerable())) {
+                    state.forcedTargetName = null;
+                } else {
+                    double dist = bot.distanceTo(forced);
+                    if (dist <= settings.getMaxTargetDistance()) {
+                        return forced;
+                    }
                 }
             }
 
@@ -361,10 +331,14 @@ public class BotCombat {
 
             if (!state.lastAttacker.isRemoved() && state.lastAttacker.isAlive()) {
 
-                if (!settings.isFriendlyFireEnabled() && state.lastAttacker instanceof PlayerEntity) {
-                    String attackerName = state.lastAttacker.getName().getString();
-                    if (BotFaction.areAllies(bot.getName().getString(), attackerName)) {
+                if (state.lastAttacker instanceof PlayerEntity lastPlayer) {
+                    if (!settings.isAttackInvincible() && (lastPlayer.isSpectator() || lastPlayer.isCreative() || lastPlayer.isInvulnerable())) {
                         state.lastAttacker = null;
+                    } else if (!settings.isFriendlyFireEnabled()) {
+                        String attackerName = lastPlayer.getName().getString();
+                        if (BotFaction.areAllies(bot.getName().getString(), attackerName)) {
+                            state.lastAttacker = null;
+                        }
                     }
                 }
                 
@@ -418,7 +392,7 @@ public class BotCombat {
             for (var player : server.getPlayerManager().getPlayerList()) {
                 if (player == bot) continue;
                 if (!player.isAlive()) continue;
-                if (player.isSpectator() || player.isCreative()) continue;
+                if (!settings.isAttackInvincible() && (player.isSpectator() || player.isCreative() || player.isInvulnerable())) continue;
                 
                 String targetName = player.getName().getString();
                 
@@ -490,7 +464,7 @@ public class BotCombat {
         
 
         if (entity instanceof PlayerEntity player) {
-            if (player.isSpectator() || player.isCreative()) return false;
+            if (!settings.isAttackInvincible() && (player.isSpectator() || player.isCreative() || player.isInvulnerable())) return false;
             
             String targetName = player.getName().getString();
             
@@ -546,9 +520,7 @@ public class BotCombat {
         double spearRange = settings.getSpearRange();
         
 
-        if (target != null && BotElytraMace.canUseElytraMace(bot, target, settings)) {
-            state.currentMode = CombatState.WeaponMode.ELYTRA_MACE;
-        } else if (target != null && BotCrystalPvp.canUseCrystalPvp(bot, target, settings)) {
+        if (target != null && BotCrystalPvp.canUseCrystalPvp(bot, target, settings)) {
             state.currentMode = CombatState.WeaponMode.CRYSTAL;
         } else if (target != null && BotAnchorPvp.canUseAnchorPvp(bot, target, settings)) {
             state.currentMode = CombatState.WeaponMode.ANCHOR;
@@ -571,32 +543,29 @@ public class BotCombat {
     
     
     private static boolean isTargetMaceAttacking(Entity target) {
-        if (!(target instanceof PlayerEntity player)) return false;
-        
+            if (!(target instanceof PlayerEntity player)) return false;
 
-        ItemStack mainHand = player.getMainHandStack();
-        boolean hasMace = mainHand.getItem() == Items.MACE;
-        
-        if (!hasMace) return false;
-        
+            // Check if target has mace in main hand
+            ItemStack mainHand = player.getMainHandStack();
+            boolean hasMace = mainHand.getItem() == Items.MACE;
 
-        boolean inAir = !player.isOnGround();
-        if (!inAir) return false;
-        
+            if (!hasMace) return false;
 
-        double velocityY = player.getVelocity().y;
-        
+            // Check if target is not on ground (in air)
+            boolean inAir = !player.isOnGround();
+            if (!inAir) return false;
 
+            // Check if target is falling (negative Y velocity) - predict earlier for shield bug
+            double velocityY = player.getVelocity().y;
 
+            // Predict mace attack when player is falling down
+            // Use -0.08 threshold to catch falling but still give 10+ ticks warning
+            // This compensates for vanilla shield bug where shield needs to be raised earlier
+            boolean willAttackSoon = velocityY < -0.08; // Only when actually falling
 
-        boolean willAttackSoon = velocityY < -0.08;
-        
-        if (willAttackSoon) {
-            System.out.println("[MACE_DETECTION] " + player.getName().getString() + " attacking with mace! (vel: " + String.format("%.2f", velocityY) + ")");
+            return willAttackSoon;
         }
-        
-        return willAttackSoon;
-    }
+
     
     
     private static void handleMaceDefense(ServerPlayerEntity bot, Entity target, BotSettings settings, net.minecraft.server.MinecraftServer server) {
@@ -619,7 +588,6 @@ public class BotCombat {
 
             combatState.maceDefenseCooldown = 20;
             combatState.isMaceDefending = true;
-            System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " detected mace attack from " + target.getName().getString() + "! Settings: shieldmace=" + settings.isShieldMace());
         }
         
 
@@ -633,7 +601,6 @@ public class BotCombat {
                         "player " + bot.getName().getString() + " stop", 
                         server.getCommandSource()
                     );
-                    System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " stopped defending (cooldown expired)");
                 } catch (Exception e) {
                     bot.clearActiveItem();
                 }
@@ -646,70 +613,28 @@ public class BotCombat {
 
         int shieldSlot = findShield(inventory);
         if (shieldSlot < 0) {
-            System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " has no shield!");
             return;
         }
         
 
-        ItemStack offhand = inventory.getStack(40);
-        boolean hasTotem = offhand.getItem() == Items.TOTEM_OF_UNDYING;
-        
-        if (hasTotem && !settings.isPreferShieldMace()) {
-            System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " has totem and preferShieldMace is false, skipping");
-            return;
+        if (shieldSlot != 40) {
+            ItemStack shield = inventory.getStack(shieldSlot);
+            ItemStack current = inventory.getStack(40);
+            inventory.setStack(shieldSlot, current);
+            inventory.setStack(40, shield);
         }
         
 
-        if (settings.isShieldMainHand() && hasTotem) {
-
-            if (shieldSlot != 0) {
-                ItemStack shield = inventory.getStack(shieldSlot);
-                ItemStack current = inventory.getStack(0);
-                inventory.setStack(shieldSlot, current);
-                inventory.setStack(0, shield);
-                shieldSlot = 0;
-                System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " moved shield to main hand (slot 0)");
+        if (!combatState.isUsingShield) {
+            try {
+                server.getCommandManager().getDispatcher().execute(
+                    "player " + bot.getName().getString() + " use continuous", 
+                    server.getCommandSource()
+                );
+            } catch (Exception e) {
+                bot.setCurrentHand(Hand.OFF_HAND);
             }
-            
-
-            org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
-            
-
-            if (!combatState.isUsingShield) {
-                try {
-                    server.getCommandManager().getDispatcher().execute(
-                        "player " + bot.getName().getString() + " use continuous", 
-                        server.getCommandSource()
-                    );
-                    System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " activating shield in main hand");
-                } catch (Exception e) {
-                    bot.setCurrentHand(Hand.MAIN_HAND);
-                }
-                combatState.isUsingShield = true;
-            }
-        } else {
-
-            if (shieldSlot != 40) {
-                ItemStack shield = inventory.getStack(shieldSlot);
-                ItemStack current = inventory.getStack(40);
-                inventory.setStack(shieldSlot, current);
-                inventory.setStack(40, shield);
-                System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " moved shield to offhand");
-            }
-            
-
-            if (!combatState.isUsingShield) {
-                try {
-                    server.getCommandManager().getDispatcher().execute(
-                        "player " + bot.getName().getString() + " use continuous", 
-                        server.getCommandSource()
-                    );
-                    System.out.println("[MACE_DEFENSE] " + bot.getName().getString() + " activating shield in offhand");
-                } catch (Exception e) {
-                    bot.setCurrentHand(Hand.OFF_HAND);
-                }
-                combatState.isUsingShield = true;
-            }
+            combatState.isUsingShield = true;
         }
     }
     
@@ -759,44 +684,62 @@ public class BotCombat {
         }
         
 
+        // === ENEMY ATTACK PREDICTION ===
+        if (target instanceof ServerPlayerEntity enemy) {
+            state.enemyCooldown--;
+            if (state.enemyCooldown < 0) state.enemyCooldown = 0;
+            double enemyDist = bot.distanceTo(enemy);
+            boolean enemyClosing = enemyDist < state.lastEnemyDist;
+            state.lastEnemyDist = enemyDist;
+            boolean enemySprinting = enemy.isSprinting();
+            boolean inMelee = distance <= meleeRange + 1;
+
+            // Enemy sprinting toward + in range + distance decreasing = about to attack
+            if (inMelee && enemySprinting && enemyClosing && state.enemyCooldown <= 0) {
+                state.shieldPredictTicks = 10 + random.nextInt(8);
+                state.shieldHoldTicks = 6;
+                state.enemyCooldown = 15 + random.nextInt(10);
+            }
+        }
+        if (state.shieldPredictTicks > 0) state.shieldPredictTicks--;
+        if (state.shieldFlickerTicks > 0) state.shieldFlickerTicks--;
+        if (state.shieldHoldTicks > 0) state.shieldHoldTicks--;
+
         float healthPercent = bot.getHealth() / bot.getMaxHealth();
-        boolean shouldUseShield = settings.isAutoShieldEnabled() && healthPercent < settings.getShieldHealthThreshold();
-        
+        boolean lowHealth = healthPercent < settings.getShieldHealthThreshold();
+        boolean willAttack = distance <= meleeRange && state.attackCooldown == 1;
 
+        // Decide to hold shield
+        boolean holdShield = false;
+        if (state.shieldPredictTicks > 0 || state.shieldHoldTicks > 0) {
+            holdShield = true;
+        } else if (!willAttack && lowHealth && settings.isAutoShieldEnabled()) {
+            holdShield = true;
+        } else if (inventory.getStack(40).getItem() == Items.SHIELD && !willAttack && random.nextFloat() < 0.02f) {
+            holdShield = true; // 2% random flicker per tick
+            state.shieldFlickerTicks = 3 + random.nextInt(3);
+        }
+        if (state.shieldFlickerTicks > 0) holdShield = true;
 
-        boolean willAttackSoon = distance <= meleeRange && state.attackCooldown == 1;
-        boolean shouldHoldShield = shouldUseShield && !willAttackSoon;
-        
-        if (shouldUseShield) {
-
-            ItemStack offhandItem = bot.getOffHandStack();
-            if (offhandItem.isEmpty() || !offhandItem.getItem().toString().contains("shield")) {
-                int shieldSlot = findShield(inventory);
-                if (shieldSlot >= 0) {
-
-                    ItemStack shield = inventory.getStack(shieldSlot);
-                    inventory.setStack(40, shield);
-                    inventory.setStack(shieldSlot, ItemStack.EMPTY);
-                }
+        // Equip shield to offhand
+        boolean hasShieldInOffhand = bot.getOffHandStack().getItem() == Items.SHIELD;
+        if (holdShield && !hasShieldInOffhand) {
+            int shieldSlot = findShield(inventory);
+            if (shieldSlot >= 0) {
+                ItemStack shield = inventory.getStack(shieldSlot);
+                inventory.setStack(40, shield);
+                inventory.setStack(shieldSlot, ItemStack.EMPTY);
             }
-            
+        }
 
-            if (shouldHoldShield && !state.isUsingShield) {
-
-                startUsingShield(bot, server);
-                state.isUsingShield = true;
-            } else if (!shouldHoldShield && state.isUsingShield) {
-
-                stopUsingShield(bot, server);
-                state.isUsingShield = false;
-            }
-        } else {
-
-            if (state.isUsingShield && state.shieldToggleCooldown <= 0) {
-                stopUsingShield(bot, server);
-                state.isUsingShield = false;
-                state.shieldToggleCooldown = 20;
-            }
+        // Toggle shield
+        if (holdShield && !state.isUsingShield && state.shieldToggleCooldown <= 0) {
+            startUsingShield(bot, server);
+            state.isUsingShield = true;
+        } else if (!holdShield && state.isUsingShield && state.shieldToggleCooldown <= 0) {
+            stopUsingShield(bot, server);
+            state.isUsingShield = false;
+            state.shieldToggleCooldown = 5;
         }
 
         if (distance <= meleeRange && state.attackCooldown <= 0) {
@@ -807,35 +750,31 @@ public class BotCombat {
             }
             
 
+            // === SHIELD BREAK (every 2 ticks while enemy blocks) ===
             if (settings.isShieldBreakEnabled() && target instanceof PlayerEntity player && player.isBlocking()) {
-
-                int axeSlot = findAxe(inventory);
-                if (axeSlot >= 0) {
-
-                    if (axeSlot >= 9) {
-                        ItemStack axe = inventory.getStack(axeSlot);
-                        ItemStack current = inventory.getStack(0);
-                        inventory.setStack(axeSlot, current);
-                        inventory.setStack(0, axe);
-                        axeSlot = 0;
+                state.shieldHitTicks++;
+                if (state.shieldHitTicks % 2 == 0 && random.nextInt(100) < settings.getShieldBreakChance()) {
+                    int axeSlot = findAxe(inventory);
+                    if (axeSlot >= 0) {
+                        if (axeSlot >= 9) {
+                            ItemStack axe = inventory.getStack(axeSlot);
+                            ItemStack current = inventory.getStack(0);
+                            inventory.setStack(axeSlot, current);
+                            inventory.setStack(0, axe);
+                            axeSlot = 0;
+                        }
+                        org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, axeSlot);
+                        attackWithCarpet(bot, target, server);
+                        state.shieldBroken = true;
+                        state.shieldBrokenTime = System.currentTimeMillis();
+                        int cooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                        state.attackCooldown = cooldown;
+                        state.shieldHitTicks = 0;
+                        return;
                     }
-                    org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, axeSlot);
-                    
-
-                    attackWithCarpet(bot, target, server);
-                    
-
-                    state.shieldBroken = true;
-                    state.shieldBrokenTime = System.currentTimeMillis();
-                    
-
-                    int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
-                    state.attackCooldown = cooldown;
-                    
-
-
-                    return;
                 }
+            } else {
+                state.shieldHitTicks = 0;
             }
             
 
@@ -866,14 +805,14 @@ public class BotCombat {
                     if (velocityY < 0) {
                         attackWithCarpet(bot, target, server);
                         
-                        int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                        int cooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
                         state.attackCooldown = cooldown;
                     }
                 }
             } else {
                 attackWithCarpet(bot, target, server);
                 
-                int cooldown = shouldUseShield ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                int cooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
                 state.attackCooldown = cooldown;
             }
         } else {
@@ -1176,16 +1115,6 @@ public class BotCombat {
         BotSettings settings = BotSettings.get();
         
 
-        try {
-            boolean cancelled = org.stepan1411.pvp_bot.api.BotAPIIntegration.fireAttackEvent(bot, target);
-            if (cancelled) {
-                return;
-            }
-        } catch (Exception e) {
-            System.err.println("[PVP_BOT_API] Error firing attack event: " + e.getMessage());
-        }
-        
-
         if (random.nextInt(100) < settings.getMissChance()) {
 
             bot.swingHand(Hand.MAIN_HAND);
@@ -1194,6 +1123,7 @@ public class BotCombat {
         
         bot.attack(target);
         bot.swingHand(Hand.MAIN_HAND);
+        BotNavigation.startWtap(bot.getName().getString());
     }
     
     
@@ -1207,12 +1137,6 @@ public class BotCombat {
             return;
         }
 
-        boolean cancelled = org.stepan1411.pvp_bot.api.BotAPIIntegration.fireAttackEvent(bot, target);
-        if (cancelled) {
-            System.out.println("[COMBAT] " + bot.getName().getString() + " attack cancelled by API");
-            bot.swingHand(Hand.MAIN_HAND);
-            return;
-        }
 
 
         if (!settings.isFriendlyFireEnabled() && target instanceof PlayerEntity) {

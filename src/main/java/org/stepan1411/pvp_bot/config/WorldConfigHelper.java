@@ -16,7 +16,6 @@ public class WorldConfigHelper {
     public static void init(MinecraftServer minecraftServer) {
         server = minecraftServer;
         currentWorldName = getWorldName();
-        System.out.println("[PVP_BOT] WorldConfigHelper initialized with world: " + currentWorldName);
     }
     
     
@@ -78,10 +77,8 @@ public class WorldConfigHelper {
     private static String getWorldName() {
         if (server != null) {
             String name = server.getSaveProperties().getLevelName();
-            System.out.println("[PVP_BOT] Getting world name: " + name);
             return name;
         }
-        System.out.println("[PVP_BOT] Server is null, using default world name");
         return "world";
     }
 }

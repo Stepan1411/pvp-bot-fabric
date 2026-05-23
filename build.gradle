@@ -22,8 +22,13 @@ loom {
 }
 
 repositories {
-    maven { url 'https://maven.nucleoid.xyz' }
     maven { url 'https://jitpack.io' } // HeroBot
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 dependencies {
@@ -32,16 +37,10 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     
-    // sgui для GUI настроек
-    modImplementation include("eu.pb4:sgui:1.12.0+1.21.11")
-    
-    // Baritone API - только для компиляции, используем для расчёта путей
-    // Не включаем в мод, чтобы избежать конфликтов версий
-    compileOnly files("libs/baritone-api-fabric-1.11.2.jar")
-    
     // HeroBot - required dependency for bot spawning and movement
     // User must install HeroBot separately, we detect it at runtime
     // No compile-time dependency needed since we use reflection
+    
 }
 
 processResources {

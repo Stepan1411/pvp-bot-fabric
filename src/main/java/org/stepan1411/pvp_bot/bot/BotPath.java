@@ -354,7 +354,6 @@ public class BotPath {
             if (loadedPaths != null) {
                 paths.clear();
                 paths.putAll(loadedPaths);
-                System.out.println("[PVP_BOT] Loaded " + paths.size() + " paths");
             }
         } catch (Exception e) {
             System.err.println("[PVP_BOT] Failed to load paths: " + e.getMessage());

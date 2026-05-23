@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "pvp_bot_gui",
+  "version": "${version}",
+  "name": "PvP bot GUI",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/pvp_bot_gui/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-datagen": [
+      "ru.stepan1411.pvp_bot_gui.client.Pvp_bot_guiDataGenerator"
+    ],
+    "client": [
+      "ru.stepan1411.pvp_bot_gui.client.Pvp_bot_guiClient"
+    ],
+    "main": [
+      "ru.stepan1411.pvp_bot_gui.Pvp_bot_gui"
+    ]
+  },
+  "mixins": [
+    "pvp_bot_gui.mixins.json",
+    {
+      "config": "pvp_bot_gui.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "sgl": ">=1.0"
+  },
+  "breaks": {
+    "carpet": "*"
+  }
+}

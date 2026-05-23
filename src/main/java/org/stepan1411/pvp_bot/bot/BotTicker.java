@@ -9,7 +9,9 @@ public class BotTicker {
 
     private static int tickCounter = 0;
     private static int autoSaveCounter = 0;
+    private static int heroBotCommandCounter = 0;
     private static final int AUTO_SAVE_INTERVAL = 1200;
+    private static final int HERO_BOT_COMMAND_INTERVAL = 20;
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(BotTicker::onServerTick);
@@ -42,16 +44,7 @@ public class BotTicker {
             ServerPlayerEntity bot = BotManager.getBot(server, botName);
             if (bot != null && bot.isAlive()) {
 
-                try {
-                    org.stepan1411.pvp_bot.api.PvpBotAPI.getEventManager().fireTickEvent(bot);
-                } catch (Exception e) {
-                    System.err.println("[PVP_BOT_API] Error firing tick event: " + e.getMessage());
-                }
-
                 BotUtils.update(bot, server);
-                
-
-                BotMovement.updateMovement(bot);
                 
 
                 boolean isFollowingWithoutAttack = BotPath.isFollowing(botName) && !BotPath.shouldAttack(botName);
@@ -131,6 +124,33 @@ public class BotTicker {
         
         if (tickCounter >= interval) {
             tickCounter = 0;
+        }
+
+        heroBotCommandCounter++;
+        if (heroBotCommandCounter >= HERO_BOT_COMMAND_INTERVAL) {
+            heroBotCommandCounter = 0;
+            try {
+                var src = server.getCommandSource();
+                var silent = new net.minecraft.server.command.ServerCommandSource(
+                    new net.minecraft.server.command.CommandOutput() {
+                        public void sendMessage(net.minecraft.text.Text message) {}
+                        public boolean shouldReceiveFeedback() { return false; }
+                        public boolean shouldTrackOutput() { return false; }
+                        public boolean shouldBroadcastConsoleToOps() { return false; }
+                    },
+                    src.getPosition(),
+                    src.getRotation(),
+                    src.getWorld(),
+                    s -> true,
+                    src.getName(),
+                    src.getDisplayName(),
+                    src.getServer(),
+                    src.getEntity()
+                );
+                boolean value = BotSettings.get().isBotLeaveOnDeath();
+                server.getCommandManager().getDispatcher().execute("herobot botLeaveOnDeath " + value, silent);
+            } catch (Exception e) {
+            }
         }
     }
 }

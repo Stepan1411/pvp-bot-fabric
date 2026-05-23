@@ -24,10 +24,10 @@ public class BotManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Set<String> bots = new HashSet<>();
     private static final Map<String, BotData> botDataMap = new HashMap<>();
+    private static final Map<String, Integer> nullTickCount = new HashMap<>();
+    private static final int MAX_NULL_TICKS = 100;
     private static Path savePath;
     private static boolean initialized = false;
-    private static int botsSpawnedTotal = 0;
-    private static int botsKilledTotal = 0;
     public static class BotData {
         public String name;
         public double x, y, z;
@@ -49,18 +49,12 @@ public class BotManager {
         }
     }
     
-    public static class StatsData {
-        public int botsSpawnedTotal = 0;
-        public int botsKilledTotal = 0;
-    }
-    
     public static void init(MinecraftServer server) {
         if (initialized) return;
         
 
         bots.clear();
         botDataMap.clear();
-        System.out.println("[PVP_BOT] Initializing BotManager for new world...");
         
         Path configDir = FabricLoader.getInstance().getConfigDir().resolve("pvpbot");
         try {
@@ -70,9 +64,7 @@ public class BotManager {
         }
         
         savePath = org.stepan1411.pvp_bot.config.WorldConfigHelper.getWorldConfigDir().resolve("bots.json");
-        System.out.println("[PVP_BOT] Bot config path: " + savePath);
         loadBots();
-        loadStats();
         BotSettings settings = BotSettings.get();
         if (settings.isBotsRelogs() && !botDataMap.isEmpty()) {
             System.out.println("[PVP_BOT] Restoring " + botDataMap.size() + " bots...");
@@ -117,8 +109,10 @@ public class BotManager {
             
             try {
                 String command = String.format(java.util.Locale.US,
-                    "player %s spawn at %.2f %.2f %.2f facing %.2f %.2f in %s in %s",
-                    name, data.x, data.y, data.z, data.yaw, data.pitch, data.dimension, data.gamemode
+                    "playerspawn %s at %.2f %.2f %.2f facing %.2f %.2f in %s on %s",
+                    name, data.x, data.y, data.z, data.yaw, data.pitch,
+                    data.gamemode != null ? data.gamemode : "survival",
+                    data.dimension
                 );
                 if (retryCount == 0) {
                     System.out.println("[PVP_BOT] Restoring bot: " + name);
@@ -126,27 +120,28 @@ public class BotManager {
                     System.out.println("[PVP_BOT] Retry #" + retryCount + " for bot: " + name);
                 }
                 dispatcher.execute(command, server.getCommandSource());
+                
                 bots.add(name);
                 botDataMap.put(name, data);
                 success = true;
-                System.out.println("[PVP_BOT] вњ“ Successfully restored bot: " + name);
+                System.out.println("[PVP_BOT] Successfully restored bot: " + name);
             } catch (Exception e) {
 
                 try {
                     String simpleCommand = String.format(java.util.Locale.US,
-                        "player %s spawn at %.2f %.2f %.2f",
+                        "playerspawn %s at %.2f %.2f %.2f",
                         name, data.x, data.y, data.z
                     );
                     dispatcher.execute(simpleCommand, server.getCommandSource());
                     bots.add(name);
                     botDataMap.put(name, data);
                     success = true;
-                    System.out.println("[PVP_BOT] вњ“ Restored bot with simple command: " + name);
+                    System.out.println("[PVP_BOT] Restored bot with simple command: " + name);
                 } catch (Exception e2) {
                     if (retryCount < MAX_RETRIES) {
-                        System.out.println("[PVP_BOT] вљ  Failed to restore bot '" + name + "', will retry... (" + (retryCount + 1) + "/" + MAX_RETRIES + ")");
+                        System.out.println("[PVP_BOT] Failed to restore bot '" + name + "', will retry... (" + (retryCount + 1) + "/" + MAX_RETRIES + ")");
                     } else {
-                        System.out.println("[PVP_BOT] вњ— Failed to restore bot '" + name + "' after " + (MAX_RETRIES + 1) + " attempts: " + e2.getMessage());
+                        System.out.println("[PVP_BOT] Failed to restore bot '" + name + "' after " + (MAX_RETRIES + 1) + " attempts: " + e2.getMessage());
                     }
                 }
             }
@@ -210,7 +205,7 @@ public class BotManager {
                 skipped++;
             }
         }
-        System.out.println("[PVP_BOT] Updated bot data: " + updated + " updated, " + skipped + " skipped, " + missing + " missing, " + bots.size() + " total in list, " + botDataMap.size() + " in data map");
+
     }
     
     
@@ -226,9 +221,7 @@ public class BotManager {
     
     
     private static void loadBots() {
-        System.out.println("[PVP_BOT] Loading bots from: " + savePath);
         if (savePath == null || !Files.exists(savePath)) {
-            System.out.println("[PVP_BOT] No bots file found, starting fresh");
             return;
         }
         
@@ -237,7 +230,6 @@ public class BotManager {
             if (loaded != null) {
                 botDataMap.putAll(loaded);
                 bots.addAll(loaded.keySet());
-                System.out.println("[PVP_BOT] Loaded " + loaded.size() + " bots from file");
             }
         } catch (Exception e) {
             System.out.println("[PVP_BOT] Failed to load bots: " + e.getMessage());
@@ -255,8 +247,6 @@ public class BotManager {
 
         updateBotData(server);
         saveBots();
-        saveStats();
-
 
         bots.clear();
         botDataMap.clear();
@@ -318,16 +308,10 @@ public class BotManager {
             if (newBot != null && !bots.contains(name)) {
                 bots.add(name);
                 botDataMap.put(name, new BotData(newBot));
-                incrementBotsSpawned();
                 saveBots();
                 System.out.println("[PVP_BOT] Added bot to list (delayed): " + name);
                 
 
-                try {
-                    org.stepan1411.pvp_bot.api.PvpBotAPI.getEventManager().fireSpawnEvent(newBot);
-                } catch (Exception e) {
-                    System.err.println("[PVP_BOT_API] Error firing spawn event: " + e.getMessage());
-                }
             } else if (newBot != null && bots.contains(name)) {
 
                 botDataMap.put(name, new BotData(newBot));
@@ -342,15 +326,9 @@ public class BotManager {
             if (!bots.contains(name)) {
                 bots.add(name);
                 botDataMap.put(name, new BotData(newBot));
-                incrementBotsSpawned();
                 saveBots();
                 System.out.println("[PVP_BOT] Added bot to list (immediate): " + name);
 
-                try {
-                    org.stepan1411.pvp_bot.api.BotAPIIntegration.fireSpawnEvent(newBot);
-                } catch (Exception e) {
-                    System.err.println("[PVP_BOT_API] Error firing spawn event: " + e.getMessage());
-                }
             }
             return true;
         }
@@ -369,7 +347,6 @@ public class BotManager {
             defaultData.dimension = source.getWorld().getRegistryKey().getValue().toString();
             defaultData.gamemode = "survival";
             botDataMap.put(name, defaultData);
-            incrementBotsSpawned();
             saveBots();
             System.out.println("[PVP_BOT] Added bot to list (default data): " + name);
         }
@@ -387,15 +364,7 @@ public class BotManager {
         BotCombat.removeState(name);
         BotUtils.removeState(name);
         BotNavigation.resetIdle(name);
-        BotBaritone.removeBaritone(name);
-        BotMovement.clearState(name);
         
-
-        try {
-            org.stepan1411.pvp_bot.api.combat.CombatStrategyRegistry.getInstance().clearCooldowns(name);
-        } catch (Exception e) {
-            System.err.println("[PVP_BOT_API] Error clearing strategy cooldowns: " + e.getMessage());
-        }
 
         String command = "player " + name + " kill";
         var dispatcher = server.getCommandManager().getDispatcher();
@@ -421,16 +390,8 @@ public class BotManager {
             BotCombat.removeState(name);
             BotUtils.removeState(name);
             BotNavigation.resetIdle(name);
-            BotBaritone.removeBaritone(name);
-            BotMovement.clearState(name);
             
 
-            try {
-                org.stepan1411.pvp_bot.api.combat.CombatStrategyRegistry.getInstance().clearCooldowns(name);
-            } catch (Exception e) {
-                System.err.println("[PVP_BOT_API] Error clearing strategy cooldowns: " + e.getMessage());
-            }
-            
             String command = "player " + name + " kill";
             try {
                 dispatcher.execute(command, source);
@@ -453,164 +414,58 @@ public class BotManager {
         return new HashSet<>(bots);
     }
     
+    public static void reloadBots() {
+        bots.clear();
+        botDataMap.clear();
+        savePath = org.stepan1411.pvp_bot.config.WorldConfigHelper.getWorldConfigDir().resolve("bots.json");
+        loadBots();
+    }
+    
     
     public static void cleanupDeadBots(MinecraftServer server) {
         boolean changed = false;
         for (String name : new HashSet<>(bots)) {
             ServerPlayerEntity bot = server.getPlayerManager().getPlayer(name);
-            
-
 
             if (bot == null) {
+                int ticks = nullTickCount.getOrDefault(name, 0) + 1;
+                nullTickCount.put(name, ticks);
+                if (ticks >= MAX_NULL_TICKS) {
+                    bots.remove(name);
+                    botDataMap.remove(name);
+                    BotCombat.removeState(name);
+                    BotUtils.removeState(name);
+                    BotNavigation.resetIdle(name);
+                    nullTickCount.remove(name);
+                    changed = true;
+                    System.out.println("[PVP_BOT] Removed dead bot (entity gone): " + name);
+                }
                 continue;
             }
-            
 
+            nullTickCount.remove(name);
             boolean isDead = !bot.isAlive() || bot.getHealth() <= 0 || bot.isDead();
             if (isDead) {
-
-
-                try {
-                    org.stepan1411.pvp_bot.api.BotAPIIntegration.fireDeathEvent(bot);
-                } catch (Exception e) {
-                    System.err.println("[PVP_BOT_API] Error firing death event: " + e.getMessage());
-                }
-                
                 bots.remove(name);
                 botDataMap.remove(name);
                 BotCombat.removeState(name);
                 BotUtils.removeState(name);
                 BotNavigation.resetIdle(name);
-                BotBaritone.removeBaritone(name);
                 
-
+                // Kick the dead bot from server
                 try {
-                    org.stepan1411.pvp_bot.api.combat.CombatStrategyRegistry.getInstance().clearCooldowns(name);
+                    var dispatcher = server.getCommandManager().getDispatcher();
+                    dispatcher.execute("player " + name + " kill", server.getCommandSource());
                 } catch (Exception e) {
-                    System.err.println("[PVP_BOT_API] Error clearing strategy cooldowns: " + e.getMessage());
+                    System.err.println("[PVP_BOT] Error kicking dead bot: " + e.getMessage());
                 }
                 
-                incrementBotsKilled();
                 changed = true;
                 System.out.println("[PVP_BOT] Removed dead bot: " + name);
             }
         }
         if (changed) {
             saveBots();
-        }
-    }
-    
-    
-    public static void syncBots(MinecraftServer server) {
-        boolean changed = false;
-
-        for (var player : server.getPlayerManager().getPlayerList()) {
-            String name = player.getName().getString();
-            
-
-            if (bots.contains(name)) continue;
-            
-
-            String className = player.getClass().getName();
-            boolean isFakePlayer = className.contains("EntityPlayerMPFake") || 
-                                   className.contains("FakePlayer") ||
-                                   className.contains("fake") ||
-                                   className.contains("Fake");
-            
-            if (isFakePlayer) {
-                bots.add(name);
-                botDataMap.put(name, new BotData(player));
-                changed = true;
-                System.out.println("[PVP_BOT] Synced Carpet bot: " + name);
-            }
-        }
-        if (changed) {
-            saveBots();
-        }
-    }
-    
-    
-    public static boolean syncBot(MinecraftServer server, String name) {
-
-        if (bots.contains(name)) {
-            return false;
-        }
-        
-
-        ServerPlayerEntity player = server.getPlayerManager().getPlayer(name);
-        if (player == null) {
-            return false;
-        }
-        
-
-        String className = player.getClass().getName();
-        boolean isFakePlayer = className.contains("EntityPlayerMPFake") || 
-                               className.contains("FakePlayer") ||
-                               className.contains("fake") ||
-                               className.contains("Fake");
-        
-        if (isFakePlayer) {
-            bots.add(name);
-            botDataMap.put(name, new BotData(player));
-            incrementBotsSpawned();
-            saveBots();
-            System.out.println("[PVP_BOT] Synced bot: " + name);
-            return true;
-        }
-        
-        return false;
-    }
-    
-    
-    public static void incrementBotsSpawned() {
-        botsSpawnedTotal++;
-        saveStats();
-
-    }
-    
-    
-    public static void incrementBotsKilled() {
-        botsKilledTotal++;
-        saveStats();
-
-    }
-    
-    
-    public static int getBotsSpawnedTotal() {
-        return botsSpawnedTotal;
-    }
-    
-    
-    public static int getBotsKilledTotal() {
-        return botsKilledTotal;
-    }
-    
-    
-    private static void saveStats() {
-        Path statsPath = WorldConfigHelper.getGlobalConfigDir().resolve("stats.json");
-        try (Writer writer = Files.newBufferedWriter(statsPath)) {
-            StatsData stats = new StatsData();
-            stats.botsSpawnedTotal = botsSpawnedTotal;
-            stats.botsKilledTotal = botsKilledTotal;
-            GSON.toJson(stats, writer);
-        } catch (Exception e) {
-            System.out.println("[PVP_BOT] Failed to save stats: " + e.getMessage());
-        }
-    }
-    
-    
-    private static void loadStats() {
-        Path statsPath = WorldConfigHelper.getGlobalConfigDir().resolve("stats.json");
-        if (!Files.exists(statsPath)) return;
-        
-        try (Reader reader = Files.newBufferedReader(statsPath)) {
-            StatsData stats = GSON.fromJson(reader, StatsData.class);
-            if (stats != null) {
-                botsSpawnedTotal = stats.botsSpawnedTotal;
-                botsKilledTotal = stats.botsKilledTotal;
-            }
-        } catch (Exception e) {
-            System.out.println("[PVP_BOT] Failed to load stats: " + e.getMessage());
         }
     }
 }

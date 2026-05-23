@@ -15,3 +15,17 @@
 /HeRoBot-master
 /test123.py
 /libs
+build/export_classpath.json
+/secretfolder
+/skins
+download_skins.py
+/PvPbotGUI/.gradle
+/PvPbotGUI/.idea
+/PvPbotGUI/build/classes
+/PvPbotGUI/build/devlibs
+/PvPbotGUI/build/loom-cache
+/PvPbotGUI/build/resources
+/PvPbotGUI/build/tmp/compileClientJava
+/PvPbotGUI/build/tmp
+/PvPbotGUI/build/reports
+/PvPbotGUI/run

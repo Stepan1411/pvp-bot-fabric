@@ -5,1252 +5,370 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.command.CommandSource;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.Vec3d;
 import org.stepan1411.pvp_bot.bot.BotCombat;
-import org.stepan1411.pvp_bot.bot.BotDebug;
 import org.stepan1411.pvp_bot.bot.BotFaction;
 import org.stepan1411.pvp_bot.bot.BotKits;
 import org.stepan1411.pvp_bot.bot.BotManager;
-import org.stepan1411.pvp_bot.bot.BotMovement;
 import org.stepan1411.pvp_bot.bot.BotNameGenerator;
 import org.stepan1411.pvp_bot.bot.BotPath;
 import org.stepan1411.pvp_bot.bot.BotSettings;
-import org.stepan1411.pvp_bot.api.PvpBotAPI;
-import org.stepan1411.pvp_bot.gui.SettingsGui;
-import org.stepan1411.pvp_bot.stats.StatsReporter;
 
-import java.lang.reflect.Method;
-import java.util.stream.Collectors;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 public class BotCommand {
-    
 
-    private static final boolean HAS_INVVIEW = FabricLoader.getInstance().isModLoaded("invview");
-    
+    private static final SuggestionProvider<ServerCommandSource> BOT_SUGGESTIONS =
+        (ctx, builder) -> {
+            for (String bot : BotManager.getAllBots()) {
+                builder.suggest(bot);
+            }
+            return builder.buildFuture();
+        };
 
-    private static final SuggestionProvider<ServerCommandSource> BOT_SUGGESTIONS = (ctx, builder) -> {
-        var server = ctx.getSource().getServer();
-        var aliveBots = BotManager.getAllBots().stream()
-            .filter(name -> {
-                var bot = server.getPlayerManager().getPlayer(name);
-                return bot != null && bot.isAlive();
-            })
-            .collect(Collectors.toList());
-        return CommandSource.suggestMatching(aliveBots, builder);
-    };
-    
+    private static final SuggestionProvider<ServerCommandSource> KIT_SUGGESTIONS =
+        (ctx, builder) -> {
+            for (String kit : BotKits.getKitNames()) {
+                builder.suggest(kit);
+            }
+            return builder.buildFuture();
+        };
 
-    private static final SuggestionProvider<ServerCommandSource> TARGET_SUGGESTIONS = (ctx, builder) -> 
-        CommandSource.suggestMatching(
-            ctx.getSource().getServer().getPlayerManager().getPlayerList().stream()
-                .map(p -> p.getName().getString())
-                .collect(Collectors.toList()), 
-            builder);
-    
-
-    private static final SuggestionProvider<ServerCommandSource> PLAYER_SUGGESTIONS = TARGET_SUGGESTIONS;
-    
-
-    private static final SuggestionProvider<ServerCommandSource> FACTION_SUGGESTIONS = (ctx, builder) -> 
-        CommandSource.suggestMatching(BotFaction.getAllFactions(), builder);
-    
-
-    private static final SuggestionProvider<ServerCommandSource> KIT_SUGGESTIONS = (ctx, builder) -> 
-        CommandSource.suggestMatching(BotKits.getKitNames(), builder);
-    
-
-    private static final SuggestionProvider<ServerCommandSource> PATH_SUGGESTIONS = (ctx, builder) -> 
-        CommandSource.suggestMatching(BotPath.getAllPaths().keySet(), builder);
+    private static final SuggestionProvider<ServerCommandSource> PLAYER_SUGGESTIONS =
+        (ctx, builder) -> {
+            for (var player : ctx.getSource().getServer().getPlayerManager().getPlayerList()) {
+                builder.suggest(player.getName().getString());
+            }
+            return builder.buildFuture();
+        };
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(
-            CommandManager.literal("pvpbot")
-                
+        dispatcher.register(CommandManager.literal("pvpbot")
+            .requires(s -> true)
 
-                .then(CommandManager.literal("spawn")
-                    .executes(ctx -> spawnBot(ctx.getSource(), BotNameGenerator.generateUniqueName()))
-                    .then(CommandManager.argument("name", StringArgumentType.word())
-                        .executes(ctx -> spawnBot(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                    )
-                )
-                
+            // ========== SPAWN ==========
+            .then(CommandManager.literal("spawn")
+                .executes(ctx -> spawn(ctx, null))
+                .then(CommandManager.argument("name", StringArgumentType.word())
+                    .executes(ctx -> spawn(ctx, StringArgumentType.getString(ctx, "name")))))
 
-                .then(CommandManager.literal("massspawn")
+            // ========== REMOVE ==========
+            .then(CommandManager.literal("remove")
+                .then(CommandManager.argument("name", StringArgumentType.word())
+                    .suggests(BOT_SUGGESTIONS)
+                    .executes(BotCommand::remove)))
+
+            // ========== REMOVEALL ==========
+            .then(CommandManager.literal("reload")
+                .executes(BotCommand::reload))
+            .then(CommandManager.literal("removeall")
+                .executes(BotCommand::removeAll))
+
+            // ========== SETTINGS ==========
+            .then(buildSettings())
+
+            // ========== BOT-MANAGEMENT ==========
+            .then(CommandManager.literal("bot-management")
+                .then(CommandManager.literal("mass-spawn")
                     .then(CommandManager.argument("count", IntegerArgumentType.integer(1, 50))
-                        .executes(ctx -> massSpawnBots(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "count")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("remove")
-                    .then(CommandManager.argument("name", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        .executes(ctx -> removeBot(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("removeall")
-                    .executes(ctx -> removeAllBots(ctx.getSource()))
-                )
-                
-
-                .then(CommandManager.literal("list")
-                    .executes(ctx -> listBots(ctx.getSource()))
-                )
-                
-
-                .then(CommandManager.literal("sync")
-                    .executes(ctx -> syncBots(ctx.getSource()))
-                    .then(CommandManager.argument("name", StringArgumentType.word())
-                        .suggests(PLAYER_SUGGESTIONS)
-                        .executes(ctx -> syncBot(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("debug")
-                    .then(CommandManager.argument("bot", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        
-
-                        .then(CommandManager.literal("path")
-                            .executes(ctx -> toggleDebugPath(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> setDebugPath(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
-                            )
-                        )
-                        
-
-                        .then(CommandManager.literal("target")
-                            .executes(ctx -> toggleDebugTarget(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> setDebugTarget(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
-                            )
-                        )
-                        
-
-                        .then(CommandManager.literal("combat")
-                            .executes(ctx -> toggleDebugCombat(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> setDebugCombat(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
-                            )
-                        )
-                        
-
-                        .then(CommandManager.literal("navigation")
-                            .executes(ctx -> toggleDebugNavigation(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> setDebugNavigation(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
-                            )
-                        )
-                        
-
-                        .then(CommandManager.literal("all")
-                            .executes(ctx -> toggleDebugAll(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                            .then(CommandManager.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> setDebugAll(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), BoolArgumentType.getBool(ctx, "enabled")))
-                            )
-                        )
-                        
-
-                        .then(CommandManager.literal("status")
-                            .executes(ctx -> showDebugStatus(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("api")
-                        .executes(ctx -> showApiDebugInfo(ctx.getSource()))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("menu")
-                    .executes(ctx -> openTestMenu(ctx.getSource()))
-                )
-                
-
-                .then(CommandManager.literal("settings")
-                    .executes(ctx -> showSettings(ctx.getSource()))
-                    
-
-                    .then(CommandManager.literal("gui")
-                        .executes(ctx -> openSettingsGui(ctx.getSource()))
-                    )
-                    
-
-                    .then(CommandManager.literal("autoarmor")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autoarmor: " + BotSettings.get().isAutoEquipArmor()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoEquipArmor(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto equip armor: " + BotSettings.get().isAutoEquipArmor()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("autoweapon")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autoweapon: " + BotSettings.get().isAutoEquipWeapon()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoEquipWeapon(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto equip weapon: " + BotSettings.get().isAutoEquipWeapon()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("droparmor")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("droparmor: " + BotSettings.get().isDropWorseArmor()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setDropWorseArmor(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Drop worse armor: " + BotSettings.get().isDropWorseArmor()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("dropweapon")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("dropweapon: " + BotSettings.get().isDropWorseWeapons()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setDropWorseWeapons(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Drop worse weapons: " + BotSettings.get().isDropWorseWeapons()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("dropdistance")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("dropdistance: " + BotSettings.get().getDropDistance()), false); return 1; })
-                        .then(CommandManager.argument("value", DoubleArgumentType.doubleArg(1.0, 10.0))
-                            .executes(ctx -> {
-                                BotSettings.get().setDropDistance(DoubleArgumentType.getDouble(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Drop distance: " + BotSettings.get().getDropDistance()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("interval")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("interval: " + BotSettings.get().getCheckInterval() + " ticks"), false); return 1; })
-                        .then(CommandManager.argument("ticks", IntegerArgumentType.integer(1, 100))
-                            .executes(ctx -> {
-                                BotSettings.get().setCheckInterval(IntegerArgumentType.getInteger(ctx, "ticks"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Check interval: " + BotSettings.get().getCheckInterval() + " ticks"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("minarmorlevel")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("minarmorlevel: " + BotSettings.get().getMinArmorLevel()), false); return 1; })
-                        .then(CommandManager.argument("level", IntegerArgumentType.integer(0, 100))
-                            .executes(ctx -> {
-                                BotSettings.get().setMinArmorLevel(IntegerArgumentType.getInteger(ctx, "level"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Min armor level: " + BotSettings.get().getMinArmorLevel() + " (0=any, 20=leather+, 40=gold+, 50=chain+, 60=iron+, 80=diamond+, 100=netherite)"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("combat")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("combat: " + BotSettings.get().isCombatEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setCombatEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Combat enabled: " + BotSettings.get().isCombatEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("revenge")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("revenge: " + BotSettings.get().isRevengeEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setRevengeEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Revenge mode: " + BotSettings.get().isRevengeEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("autotarget")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autotarget: " + BotSettings.get().isAutoTargetEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoTargetEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto target: " + BotSettings.get().isAutoTargetEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("targetplayers")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("targetplayers: " + BotSettings.get().isTargetPlayers()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setTargetPlayers(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Target players: " + BotSettings.get().isTargetPlayers()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("targetmobs")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("targetmobs: " + BotSettings.get().isTargetHostileMobs()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setTargetHostileMobs(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Target hostile mobs: " + BotSettings.get().isTargetHostileMobs()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("targetbots")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("targetbots: " + BotSettings.get().isTargetOtherBots()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setTargetOtherBots(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Target other bots: " + BotSettings.get().isTargetOtherBots()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("criticals")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("criticals: " + BotSettings.get().isCriticalsEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setCriticalsEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Criticals: " + BotSettings.get().isCriticalsEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("ranged")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("ranged: " + BotSettings.get().isRangedEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setRangedEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Ranged weapons: " + BotSettings.get().isRangedEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("mace")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("mace: " + BotSettings.get().isMaceEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setMaceEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Mace combat: " + BotSettings.get().isMaceEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("elytramace")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("elytramace: " + BotSettings.get().isElytraMaceEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setElytraMaceEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("ElytraMace trick: " + BotSettings.get().isElytraMaceEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("specialnames")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("specialnames: " + BotSettings.get().isUseSpecialNames()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setUseSpecialNames(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Use special names: " + BotSettings.get().isUseSpecialNames()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("elytramaceretries")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("elytramaceretries: " + BotSettings.get().getElytraMaceMaxRetries()), false); return 1; })
-                        .then(CommandManager.argument("value", IntegerArgumentType.integer(1, 10))
-                            .executes(ctx -> {
-                                BotSettings.get().setElytraMaceMaxRetries(IntegerArgumentType.getInteger(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("ElytraMace max retries: " + BotSettings.get().getElytraMaceMaxRetries()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("elytramacealtitude")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("elytramacealtitude: " + BotSettings.get().getElytraMaceMinAltitude()), false); return 1; })
-                        .then(CommandManager.argument("value", IntegerArgumentType.integer(5, 50))
-                            .executes(ctx -> {
-                                BotSettings.get().setElytraMaceMinAltitude(IntegerArgumentType.getInteger(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("ElytraMace min altitude: " + BotSettings.get().getElytraMaceMinAltitude()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("elytramacedistance")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("elytramacedistance: " + BotSettings.get().getElytraMaceAttackDistance()), false); return 1; })
-                        .then(CommandManager.argument("value", DoubleArgumentType.doubleArg(3.0, 15.0))
-                            .executes(ctx -> {
-                                BotSettings.get().setElytraMaceAttackDistance(DoubleArgumentType.getDouble(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("ElytraMace attack distance: " + BotSettings.get().getElytraMaceAttackDistance()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("elytramacefireworks")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("elytramacefireworks: " + BotSettings.get().getElytraMaceFireworkCount()), false); return 1; })
-                        .then(CommandManager.argument("value", IntegerArgumentType.integer(1, 10))
-                            .executes(ctx -> {
-                                BotSettings.get().setElytraMaceFireworkCount(IntegerArgumentType.getInteger(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("ElytraMace firework count: " + BotSettings.get().getElytraMaceFireworkCount()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("gotousebaritone")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("gotousebaritone: " + BotSettings.get().isGotoUseBaritone()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setGotoUseBaritone(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Goto use Baritone: " + BotSettings.get().isGotoUseBaritone()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("escortusebaritone")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("escortusebaritone: " + BotSettings.get().isEscortUseBaritone()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setEscortUseBaritone(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Escort use Baritone: " + BotSettings.get().isEscortUseBaritone()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("followusebaritone")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("followusebaritone: " + BotSettings.get().isFollowUseBaritone()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setFollowUseBaritone(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Follow use Baritone: " + BotSettings.get().isFollowUseBaritone()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("shieldmace")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("shieldmace: " + BotSettings.get().isShieldMace()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setShieldMace(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Shield mace defense: " + BotSettings.get().isShieldMace()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("prefershieldmace")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("prefershieldmace: " + BotSettings.get().isPreferShieldMace()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setPreferShieldMace(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Prefer shield over totem for mace: " + BotSettings.get().isPreferShieldMace()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("shieldmainhand")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("shieldmainhand: " + BotSettings.get().isShieldMainHand()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setShieldMainHand(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Shield in main hand when having totem: " + BotSettings.get().isShieldMainHand()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("attackcooldown")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("attackcooldown: " + BotSettings.get().getAttackCooldown() + " ticks"), false); return 1; })
-                        .then(CommandManager.argument("ticks", IntegerArgumentType.integer(1, 40))
-                            .executes(ctx -> {
-                                BotSettings.get().setAttackCooldown(IntegerArgumentType.getInteger(ctx, "ticks"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Attack cooldown: " + BotSettings.get().getAttackCooldown() + " ticks"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("meleerange")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("meleerange: " + BotSettings.get().getMeleeRange()), false); return 1; })
-                        .then(CommandManager.argument("range", DoubleArgumentType.doubleArg(2.0, 6.0))
-                            .executes(ctx -> {
-                                BotSettings.get().setMeleeRange(DoubleArgumentType.getDouble(ctx, "range"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Melee range: " + BotSettings.get().getMeleeRange()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("movespeed")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("movespeed: " + BotSettings.get().getMoveSpeed()), false); return 1; })
-                        .then(CommandManager.argument("speed", DoubleArgumentType.doubleArg(0.1, 2.0))
-                            .executes(ctx -> {
-                                BotSettings.get().setMoveSpeed(DoubleArgumentType.getDouble(ctx, "speed"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Move speed: " + BotSettings.get().getMoveSpeed()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("bhop")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("bhop: " + BotSettings.get().isBhopEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setBhopEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Bhop enabled: " + BotSettings.get().isBhopEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("bhopcooldown")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("bhopcooldown: " + BotSettings.get().getBhopCooldown() + " ticks"), false); return 1; })
-                        .then(CommandManager.argument("ticks", IntegerArgumentType.integer(5, 30))
-                            .executes(ctx -> {
-                                BotSettings.get().setBhopCooldown(IntegerArgumentType.getInteger(ctx, "ticks"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Bhop cooldown: " + BotSettings.get().getBhopCooldown() + " ticks"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("jumpboost")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("jumpboost: " + BotSettings.get().getJumpBoost()), false); return 1; })
-                        .then(CommandManager.argument("boost", DoubleArgumentType.doubleArg(0.0, 0.5))
-                            .executes(ctx -> {
-                                BotSettings.get().setJumpBoost(DoubleArgumentType.getDouble(ctx, "boost"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Jump boost: " + BotSettings.get().getJumpBoost()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("idle")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("idle: " + BotSettings.get().isIdleWanderEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setIdleWanderEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Idle wander: " + BotSettings.get().isIdleWanderEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("usebaritone")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("usebaritone: " + BotSettings.get().isUseBaritone()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setUseBaritone(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Use Baritone: " + BotSettings.get().isUseBaritone()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("idleradius")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("idleradius: " + BotSettings.get().getIdleWanderRadius()), false); return 1; })
-                        .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(3.0, 50.0))
-                            .executes(ctx -> {
-                                BotSettings.get().setIdleWanderRadius(DoubleArgumentType.getDouble(ctx, "radius"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Idle wander radius: " + BotSettings.get().getIdleWanderRadius()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("friendlyfire")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("friendlyfire: " + BotSettings.get().isFriendlyFireEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setFriendlyFireEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Friendly fire: " + BotSettings.get().isFriendlyFireEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("misschance")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("misschance: " + BotSettings.get().getMissChance() + "%"), false); return 1; })
-                        .then(CommandManager.argument("percent", IntegerArgumentType.integer(0, 100))
-                            .executes(ctx -> {
-                                BotSettings.get().setMissChance(IntegerArgumentType.getInteger(ctx, "percent"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Miss chance: " + BotSettings.get().getMissChance() + "%"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("mistakechance")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("mistakechance: " + BotSettings.get().getMistakeChance() + "%"), false); return 1; })
-                        .then(CommandManager.argument("percent", IntegerArgumentType.integer(0, 100))
-                            .executes(ctx -> {
-                                BotSettings.get().setMistakeChance(IntegerArgumentType.getInteger(ctx, "percent"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Mistake chance: " + BotSettings.get().getMistakeChance() + "%"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("reactiondelay")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("reactiondelay: " + BotSettings.get().getReactionDelay() + " ticks"), false); return 1; })
-                        .then(CommandManager.argument("ticks", IntegerArgumentType.integer(0, 20))
-                            .executes(ctx -> {
-                                BotSettings.get().setReactionDelay(IntegerArgumentType.getInteger(ctx, "ticks"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Reaction delay: " + BotSettings.get().getReactionDelay() + " ticks"), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("prefersword")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("prefersword: " + BotSettings.get().isPreferSword()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setPreferSword(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Prefer sword: " + BotSettings.get().isPreferSword()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    .then(CommandManager.literal("shieldbreak")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("shieldbreak: " + BotSettings.get().isShieldBreakEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setShieldBreakEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Shield break: " + BotSettings.get().isShieldBreakEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("autoshield")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autoshield: " + BotSettings.get().isAutoShieldEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoShieldEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto shield: " + BotSettings.get().isAutoShieldEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("autopotion")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autopotion: " + BotSettings.get().isAutoPotionEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoPotionEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto potion: " + BotSettings.get().isAutoPotionEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("autototem")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autototem: " + BotSettings.get().isAutoTotemEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoTotemEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto totem: " + BotSettings.get().isAutoTotemEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("totempriority")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("totempriority: " + BotSettings.get().isTotemPriority()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setTotemPriority(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Totem priority (don't replace with shield): " + BotSettings.get().isTotemPriority()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("retreat")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("retreat: " + BotSettings.get().isRetreatEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setRetreatEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Retreat enabled: " + BotSettings.get().isRetreatEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("autoeat")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("autoeat: " + BotSettings.get().isAutoEatEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoEatEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto eat enabled: " + BotSettings.get().isAutoEatEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                    
-
-                    .then(CommandManager.literal("automend")
-                        .executes(ctx -> { ctx.getSource().sendFeedback(() -> Text.literal("automend: " + BotSettings.get().isAutoMendEnabled()), false); return 1; })
-                        .then(CommandManager.argument("value", BoolArgumentType.bool())
-                            .executes(ctx -> {
-                                BotSettings.get().setAutoMendEnabled(BoolArgumentType.getBool(ctx, "value"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("Auto mend enabled: " + BotSettings.get().isAutoMendEnabled()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                )
-                
-
+                        .executes(BotCommand::massSpawn)))
                 .then(CommandManager.literal("attack")
                     .then(CommandManager.argument("botname", StringArgumentType.word())
                         .suggests(BOT_SUGGESTIONS)
                         .then(CommandManager.argument("target", StringArgumentType.word())
-                            .suggests(TARGET_SUGGESTIONS)
-                            .executes(ctx -> setAttackTarget(ctx.getSource(), 
-                                StringArgumentType.getString(ctx, "botname"),
-                                StringArgumentType.getString(ctx, "target")))
-                        )
-                    )
-                )
-                
-
-                .then(CommandManager.literal("stop")
+                            .suggests(PLAYER_SUGGESTIONS)
+                            .executes(BotCommand::botAttack))))
+                .then(CommandManager.literal("stop-attack")
                     .then(CommandManager.argument("botname", StringArgumentType.word())
                         .suggests(BOT_SUGGESTIONS)
-                        .executes(ctx -> stopAttack(ctx.getSource(), StringArgumentType.getString(ctx, "botname")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("stopmovement")
-                    .then(CommandManager.argument("botname", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        .executes(ctx -> stopBotMovement(ctx.getSource(), StringArgumentType.getString(ctx, "botname")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("follow")
-                    .then(CommandManager.argument("botname", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        .then(CommandManager.argument("target", StringArgumentType.word())
-                            .suggests(TARGET_SUGGESTIONS)
-                            .executes(ctx -> setBotFollow(ctx.getSource(), 
-                                StringArgumentType.getString(ctx, "botname"),
-                                StringArgumentType.getString(ctx, "target"), false))
-                        )
-                    )
-                )
-                
-
-                .then(CommandManager.literal("escort")
-                    .then(CommandManager.argument("botname", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        .then(CommandManager.argument("target", StringArgumentType.word())
-                            .suggests(TARGET_SUGGESTIONS)
-                            .executes(ctx -> setBotFollow(ctx.getSource(), 
-                                StringArgumentType.getString(ctx, "botname"),
-                                StringArgumentType.getString(ctx, "target"), true))
-                        )
-                    )
-                )
-                
-
-                .then(CommandManager.literal("goto")
-                    .then(CommandManager.argument("botname", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        .then(CommandManager.argument("x", DoubleArgumentType.doubleArg())
-                            .then(CommandManager.argument("y", DoubleArgumentType.doubleArg())
-                                .then(CommandManager.argument("z", DoubleArgumentType.doubleArg())
-                                    .executes(ctx -> setBotGoto(ctx.getSource(), 
-                                        StringArgumentType.getString(ctx, "botname"),
-                                        DoubleArgumentType.getDouble(ctx, "x"),
-                                        DoubleArgumentType.getDouble(ctx, "y"),
-                                        DoubleArgumentType.getDouble(ctx, "z")))
-                                )
-                            )
-                        )
-                    )
-                )
-                
-
-                .then(CommandManager.literal("target")
-                    .then(CommandManager.argument("botname", StringArgumentType.word())
-                        .suggests(BOT_SUGGESTIONS)
-                        .executes(ctx -> showTarget(ctx.getSource(), StringArgumentType.getString(ctx, "botname")))
-                    )
-                )
-                
-
+                        .executes(BotCommand::botStopAttack)))
                 .then(CommandManager.literal("inventory")
                     .then(CommandManager.argument("botname", StringArgumentType.word())
                         .suggests(BOT_SUGGESTIONS)
-                        .executes(ctx -> showInventory(ctx.getSource(), StringArgumentType.getString(ctx, "botname")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("faction")
-
-                    .then(CommandManager.literal("list")
-                        .executes(ctx -> listFactions(ctx.getSource()))
-                    )
-
-                    .then(CommandManager.literal("create")
-                        .then(CommandManager.argument("name", StringArgumentType.word())
-                            .executes(ctx -> createFaction(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
-
-                    .then(CommandManager.literal("delete")
-                        .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .executes(ctx -> deleteFaction(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
-
-                    .then(CommandManager.literal("add")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("player", StringArgumentType.word())
-                                .suggests(TARGET_SUGGESTIONS)
-                                .executes(ctx -> addToFaction(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "player")))
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("remove")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("player", StringArgumentType.word())
-                                .executes(ctx -> removeFromFaction(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "player")))
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("hostile")
-                        .then(CommandManager.argument("faction1", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("faction2", StringArgumentType.word())
-                                .suggests(FACTION_SUGGESTIONS)
-                                .executes(ctx -> setHostile(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction1"),
-                                    StringArgumentType.getString(ctx, "faction2"),
-                                    true))
-                                .then(CommandManager.argument("hostile", BoolArgumentType.bool())
-                                    .executes(ctx -> setHostile(ctx.getSource(), 
-                                        StringArgumentType.getString(ctx, "faction1"),
-                                        StringArgumentType.getString(ctx, "faction2"),
-                                        BoolArgumentType.getBool(ctx, "hostile")))
-                                )
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("info")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .executes(ctx -> factionInfo(ctx.getSource(), StringArgumentType.getString(ctx, "faction")))
-                        )
-                    )
-
-                    .then(CommandManager.literal("addnear")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1.0, 10000.0))
-                                .executes(ctx -> addNearbyBotsToFaction(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    DoubleArgumentType.getDouble(ctx, "radius")))
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("addall")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .executes(ctx -> addAllBotsToFaction(ctx.getSource(), 
-                                StringArgumentType.getString(ctx, "faction")))
-                        )
-                    )
-
-                    .then(CommandManager.literal("give")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("item", StringArgumentType.greedyString())
-                                .executes(ctx -> giveFactionItem(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "item")))
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("attack")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("target", StringArgumentType.word())
-                                .suggests(TARGET_SUGGESTIONS)
-                                .executes(ctx -> factionAttack(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "target")))
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("startpath")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("path", StringArgumentType.word())
-                                .suggests(PATH_SUGGESTIONS)
-                                .executes(ctx -> factionStartPath(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "path")))
-                            )
-                        )
-                    )
-
-                    .then(CommandManager.literal("stoppath")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .executes(ctx -> factionStopPath(ctx.getSource(), 
-                                StringArgumentType.getString(ctx, "faction")))
-                        )
-                    )
-                    
-                    .then(CommandManager.literal("follow")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("target", StringArgumentType.word())
-                                .suggests(TARGET_SUGGESTIONS)
-                                .executes(ctx -> factionFollow(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "target"), false))
-                            )
-                        )
-                    )
-                    
-                    .then(CommandManager.literal("escort")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("target", StringArgumentType.word())
-                                .suggests(TARGET_SUGGESTIONS)
-                                .executes(ctx -> factionFollow(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "target"), true))
-                            )
-                        )
-                    )
-                    
-                    .then(CommandManager.literal("goto")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("x", DoubleArgumentType.doubleArg())
-                                .then(CommandManager.argument("y", DoubleArgumentType.doubleArg())
-                                    .then(CommandManager.argument("z", DoubleArgumentType.doubleArg())
-                                        .executes(ctx -> factionGoto(ctx.getSource(), 
-                                            StringArgumentType.getString(ctx, "faction"),
-                                            DoubleArgumentType.getDouble(ctx, "x"),
-                                            DoubleArgumentType.getDouble(ctx, "y"),
-                                            DoubleArgumentType.getDouble(ctx, "z")))
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-                
-
-                .then(CommandManager.literal("settings")
-                    .then(CommandManager.literal("viewdistance")
-                        .executes(ctx -> { 
-                            ctx.getSource().sendFeedback(() -> Text.literal("viewdistance: " + BotSettings.get().getMaxTargetDistance()), false); 
-                            return 1; 
-                        })
-                        .then(CommandManager.argument("distance", DoubleArgumentType.doubleArg(5.0, 128.0))
-                            .executes(ctx -> {
-                                BotSettings.get().setMaxTargetDistance(DoubleArgumentType.getDouble(ctx, "distance"));
-                                ctx.getSource().sendFeedback(() -> Text.literal("View distance: " + BotSettings.get().getMaxTargetDistance()), true);
-                                return 1;
-                            })
-                        )
-                    )
-                )
-                
-
-
-                .then(CommandManager.literal("createkit")
-                    .then(CommandManager.argument("name", StringArgumentType.word())
-                        .executes(ctx -> createKit(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("deletekit")
-                    .then(CommandManager.argument("name", StringArgumentType.word())
-                        .suggests(KIT_SUGGESTIONS)
-                        .executes(ctx -> deleteKit(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                    )
-                )
-                
-
-                .then(CommandManager.literal("kits")
-                    .executes(ctx -> listKits(ctx.getSource()))
-                )
-                
-
-                .then(CommandManager.literal("givekit")
-                    .then(CommandManager.argument("playername", StringArgumentType.word())
-                        .suggests(PLAYER_SUGGESTIONS)
-                        .then(CommandManager.argument("kitname", StringArgumentType.word())
-                            .suggests(KIT_SUGGESTIONS)
-                            .executes(ctx -> giveKitToPlayer(ctx.getSource(), 
-                                StringArgumentType.getString(ctx, "playername"),
-                                StringArgumentType.getString(ctx, "kitname")))
-                        )
-                    )
-                )
-                
-
-                .then(CommandManager.literal("faction")
-                    .then(CommandManager.literal("givekit")
-                        .then(CommandManager.argument("faction", StringArgumentType.word())
-                            .suggests(FACTION_SUGGESTIONS)
-                            .then(CommandManager.argument("kitname", StringArgumentType.word())
-                                .suggests(KIT_SUGGESTIONS)
-                                .executes(ctx -> giveKitToFaction(ctx.getSource(), 
-                                    StringArgumentType.getString(ctx, "faction"),
-                                    StringArgumentType.getString(ctx, "kitname")))
-                            )
-                        )
-                    )
-                )
-                
-
-                
-
+                        .executes(BotCommand::botInventory)))
+                .then(CommandManager.literal("list")
+                    .executes(BotCommand::botList))
                 .then(CommandManager.literal("path")
                     .then(CommandManager.literal("create")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .executes(ctx -> createPath(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
+                            .executes(BotCommand::pathCreate)))
                     .then(CommandManager.literal("delete")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> deletePath(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
+                            .executes(BotCommand::pathDelete)))
                     .then(CommandManager.literal("addpoint")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> addPathPoint(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
+                            .executes(BotCommand::pathAddPoint)))
                     .then(CommandManager.literal("removepoint")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> removeLastPathPoint(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                            .then(CommandManager.argument("index", IntegerArgumentType.integer(0))
-                                .executes(ctx -> removePathPoint(ctx.getSource(), StringArgumentType.getString(ctx, "name"), IntegerArgumentType.getInteger(ctx, "index")))
-                            )
-                        )
-                    )
+                            .then(CommandManager.argument("index", IntegerArgumentType.integer())
+                                .executes(BotCommand::pathRemovePoint))
+                            .executes(BotCommand::pathRemovePointLast)))
                     .then(CommandManager.literal("clear")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> clearPath(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
+                            .executes(BotCommand::pathClear)))
                     .then(CommandManager.literal("loop")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("value", BoolArgumentType.bool())
-                                .executes(ctx -> setPathLoop(ctx.getSource(), StringArgumentType.getString(ctx, "name"), BoolArgumentType.getBool(ctx, "value")))
-                            )
-                        )
-                    )
+                                .executes(BotCommand::pathLoop))))
                     .then(CommandManager.literal("attack")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("value", BoolArgumentType.bool())
-                                .executes(ctx -> setPathAttack(ctx.getSource(), StringArgumentType.getString(ctx, "name"), BoolArgumentType.getBool(ctx, "value")))
-                            )
-                        )
-                    )
+                                .executes(BotCommand::pathAttack))))
                     .then(CommandManager.literal("start")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
                             .suggests(BOT_SUGGESTIONS)
                             .then(CommandManager.argument("path", StringArgumentType.word())
-                                .suggests(PATH_SUGGESTIONS)
-                                .executes(ctx -> startPathFollowing(ctx.getSource(), StringArgumentType.getString(ctx, "bot"), StringArgumentType.getString(ctx, "path")))
-                            )
-                        )
-                    )
+                                .executes(BotCommand::pathStart))))
                     .then(CommandManager.literal("stop")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
                             .suggests(BOT_SUGGESTIONS)
-                            .executes(ctx -> stopPathFollowing(ctx.getSource(), StringArgumentType.getString(ctx, "bot")))
-                        )
-                    )
+                            .executes(BotCommand::pathStop)))
                     .then(CommandManager.literal("list")
-                        .executes(ctx -> listPaths(ctx.getSource()))
-                    )
+                        .executes(BotCommand::pathList))
                     .then(CommandManager.literal("show")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("visible", BoolArgumentType.bool())
-                                .executes(ctx -> showPath(ctx.getSource(), StringArgumentType.getString(ctx, "name"), BoolArgumentType.getBool(ctx, "visible")))
-                            )
-                        )
-                    )
+                                .executes(BotCommand::pathShow))))
                     .then(CommandManager.literal("info")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> pathInfo(ctx.getSource(), StringArgumentType.getString(ctx, "name")))
-                        )
-                    )
-
+                            .executes(BotCommand::pathInfo)))
                     .then(CommandManager.literal("distribute")
                         .then(CommandManager.argument("path", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> distributeBotsOnPath(ctx.getSource(), StringArgumentType.getString(ctx, "path")))
-                        )
-                    )
-
+                            .executes(BotCommand::pathDistribute)))
                     .then(CommandManager.literal("startnear")
                         .then(CommandManager.argument("path", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1.0))
-                                .executes(ctx -> startPathNear(ctx.getSource(), StringArgumentType.getString(ctx, "path"), DoubleArgumentType.getDouble(ctx, "radius")))
-                            )
-                        )
-                    )
-
+                            .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1))
+                                .executes(BotCommand::pathStartNear))))
                     .then(CommandManager.literal("stopall")
                         .then(CommandManager.argument("path", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
-                            .executes(ctx -> stopAllOnPath(ctx.getSource(), StringArgumentType.getString(ctx, "path")))
-                        )
-                    )
-                )
-                .then(CommandManager.literal("updatestats")
-                    .executes(ctx -> updateStats(ctx.getSource()))
-                )
+                            .executes(BotCommand::pathStopAll)))))
+
+            // ========== KIT ==========
+            .then(CommandManager.literal("kit")
+                .then(CommandManager.literal("create-kit")
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                        .executes(BotCommand::kitCreate)))
+                .then(CommandManager.literal("delete-kit")
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                        .suggests(KIT_SUGGESTIONS)
+                        .executes(BotCommand::kitDelete)))
+                .then(CommandManager.literal("give-kit")
+                    .then(CommandManager.argument("playername", StringArgumentType.word())
+                        .suggests(PLAYER_SUGGESTIONS)
+                        .then(CommandManager.argument("kitname", StringArgumentType.word())
+                            .suggests(KIT_SUGGESTIONS)
+                            .executes(BotCommand::kitGive))))
+                .then(CommandManager.literal("kits")
+                    .executes(BotCommand::kitList)))
+
+            // ========== FACTION ==========
+            .then(CommandManager.literal("faction")
+                .then(CommandManager.literal("list")
+                    .executes(BotCommand::factionList))
+                .then(CommandManager.literal("create")
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                        .executes(BotCommand::factionCreate)))
+                .then(CommandManager.literal("delete")
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                        .executes(BotCommand::factionDelete)))
+                .then(CommandManager.literal("add")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("player", StringArgumentType.word())
+                            .suggests(PLAYER_SUGGESTIONS)
+                            .executes(BotCommand::factionAdd))))
+                .then(CommandManager.literal("remove")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("player", StringArgumentType.word())
+                            .suggests(PLAYER_SUGGESTIONS)
+                            .executes(BotCommand::factionRemove))))
+                .then(CommandManager.literal("hostile")
+                    .then(CommandManager.argument("faction1", StringArgumentType.word())
+                        .then(CommandManager.argument("faction2", StringArgumentType.word())
+                            .then(CommandManager.argument("hostile", BoolArgumentType.bool())
+                                .executes(ctx -> factionHostile(ctx, BoolArgumentType.getBool(ctx, "hostile"))))
+                            .executes(ctx -> factionHostile(ctx, true)))))
+                .then(CommandManager.literal("info")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .executes(BotCommand::factionInfo)))
+                .then(CommandManager.literal("addnear")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1, 10000))
+                            .executes(BotCommand::factionAddNear))))
+                .then(CommandManager.literal("addall")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .executes(BotCommand::factionAddAll)))
+                .then(CommandManager.literal("give")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("item", StringArgumentType.greedyString())
+                            .executes(BotCommand::factionGive))))
+                .then(CommandManager.literal("attack")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("target", StringArgumentType.word())
+                            .suggests(PLAYER_SUGGESTIONS)
+                            .executes(BotCommand::factionAttack))))
+                .then(CommandManager.literal("startpath")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("path", StringArgumentType.word())
+                            .executes(BotCommand::factionStartPath))))
+                .then(CommandManager.literal("stoppath")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .executes(BotCommand::factionStopPath)))
+                .then(CommandManager.literal("givekit")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .then(CommandManager.argument("kitname", StringArgumentType.word())
+                            .suggests(KIT_SUGGESTIONS)
+                            .executes(BotCommand::factionGiveKit)))))
         );
     }
-    
-    private static int setAttackTarget(ServerCommandSource source, String botName, String targetName) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("Bot '" + botName + "' not found!"));
-            return 0;
-        }
-        
-        BotCombat.setTarget(botName, targetName);
-        source.sendFeedback(() -> Text.literal("Bot '" + botName + "' now attacking '" + targetName + "'"), true);
-        return 1;
-    }
-    
-    private static int stopAttack(ServerCommandSource source, String botName) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("Bot '" + botName + "' not found!"));
-            return 0;
-        }
-        
-        BotCombat.clearTarget(botName);
-        source.sendFeedback(() -> Text.literal("Bot '" + botName + "' stopped attacking"), true);
-        return 1;
-    }
-    
-    private static int showTarget(ServerCommandSource source, String botName) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("Bot '" + botName + "' not found!"));
-            return 0;
-        }
-        
-        var target = BotCombat.getTarget(botName);
-        if (target != null) {
-            source.sendFeedback(() -> Text.literal("Bot '" + botName + "' target: " + target.getName().getString()), false);
-        } else {
-            source.sendFeedback(() -> Text.literal("Bot '" + botName + "' has no target"), false);
-        }
-        return 1;
+
+    // ========== SETTINGS BUILDER ==========
+
+    private static LiteralArgumentBuilder<ServerCommandSource> buildSettings() {
+        var settings = CommandManager.literal("settings")
+            .executes(BotCommand::settings);
+
+        settings.then(boolSetting("auto-armor", () -> BotSettings.get().isAutoEquipArmor(), v -> BotSettings.get().setAutoEquipArmor(v)));
+        settings.then(boolSetting("auto-weapon", () -> BotSettings.get().isAutoEquipWeapon(), v -> BotSettings.get().setAutoEquipWeapon(v)));
+        settings.then(boolSetting("drop-armor", () -> BotSettings.get().isDropWorseArmor(), v -> BotSettings.get().setDropWorseArmor(v)));
+        settings.then(boolSetting("drop-weapon", () -> BotSettings.get().isDropWorseWeapons(), v -> BotSettings.get().setDropWorseWeapons(v)));
+        settings.then(doubleSetting("drop-distance", () -> BotSettings.get().getDropDistance(), v -> BotSettings.get().setDropDistance(v), 1.0, 10.0));
+        settings.then(intSetting("interval", () -> BotSettings.get().getCheckInterval(), v -> BotSettings.get().setCheckInterval(v), 1, 100));
+        settings.then(boolSetting("combat", () -> BotSettings.get().isCombatEnabled(), v -> BotSettings.get().setCombatEnabled(v)));
+        settings.then(boolSetting("revenge", () -> BotSettings.get().isRevengeEnabled(), v -> BotSettings.get().setRevengeEnabled(v)));
+        settings.then(boolSetting("auto-target", () -> BotSettings.get().isAutoTargetEnabled(), v -> BotSettings.get().setAutoTargetEnabled(v)));
+        settings.then(boolSetting("target-players", () -> BotSettings.get().isTargetPlayers(), v -> BotSettings.get().setTargetPlayers(v)));
+        settings.then(boolSetting("target-mobs", () -> BotSettings.get().isTargetHostileMobs(), v -> BotSettings.get().setTargetHostileMobs(v)));
+        settings.then(boolSetting("target-bots", () -> BotSettings.get().isTargetOtherBots(), v -> BotSettings.get().setTargetOtherBots(v)));
+        settings.then(boolSetting("criticals", () -> BotSettings.get().isCriticalsEnabled(), v -> BotSettings.get().setCriticalsEnabled(v)));
+        settings.then(boolSetting("ranged", () -> BotSettings.get().isRangedEnabled(), v -> BotSettings.get().setRangedEnabled(v)));
+        settings.then(boolSetting("mace", () -> BotSettings.get().isMaceEnabled(), v -> BotSettings.get().setMaceEnabled(v)));
+        settings.then(boolSetting("special-names", () -> BotSettings.get().isUseSpecialNames(), v -> BotSettings.get().setUseSpecialNames(v)));
+        settings.then(boolSetting("shield-mace", () -> BotSettings.get().isShieldMace(), v -> BotSettings.get().setShieldMace(v)));
+        settings.then(intSetting("attack-cooldown", () -> BotSettings.get().getAttackCooldown(), v -> BotSettings.get().setAttackCooldown(v), 1, 40));
+        settings.then(doubleSetting("melee-range", () -> BotSettings.get().getMeleeRange(), v -> BotSettings.get().setMeleeRange(v), 2.0, 6.0));
+        settings.then(doubleSetting("move-speed", () -> BotSettings.get().getMoveSpeed(), v -> BotSettings.get().setMoveSpeed(v), 0.1, 2.0));
+        settings.then(boolSetting("auto-totem", () -> BotSettings.get().isAutoTotemEnabled(), v -> BotSettings.get().setAutoTotemEnabled(v)));
+        settings.then(boolSetting("totem-priority", () -> BotSettings.get().isTotemPriority(), v -> BotSettings.get().setTotemPriority(v)));
+        settings.then(boolSetting("auto-shield", () -> BotSettings.get().isAutoShieldEnabled(), v -> BotSettings.get().setAutoShieldEnabled(v)));
+        settings.then(boolSetting("auto-potion", () -> BotSettings.get().isAutoPotionEnabled(), v -> BotSettings.get().setAutoPotionEnabled(v)));
+        settings.then(boolSetting("shield-break", () -> BotSettings.get().isShieldBreakEnabled(), v -> BotSettings.get().setShieldBreakEnabled(v)));
+        settings.then(boolSetting("prefer-sword", () -> BotSettings.get().isPreferSword(), v -> BotSettings.get().setPreferSword(v)));
+        settings.then(boolSetting("bhop", () -> BotSettings.get().isBhopEnabled(), v -> BotSettings.get().setBhopEnabled(v)));
+        settings.then(boolSetting("idle", () -> BotSettings.get().isIdleWanderEnabled(), v -> BotSettings.get().setIdleWanderEnabled(v)));
+        settings.then(doubleSetting("idle-radius", () -> BotSettings.get().getIdleWanderRadius(), v -> BotSettings.get().setIdleWanderRadius(v), 3.0, 50.0));
+        settings.then(boolSetting("friendly-fire", () -> BotSettings.get().isFriendlyFireEnabled(), v -> BotSettings.get().setFriendlyFireEnabled(v)));
+        settings.then(intSetting("miss-chance", () -> BotSettings.get().getMissChance(), v -> BotSettings.get().setMissChance(v), 0, 100));
+        settings.then(intSetting("mistake-chance", () -> BotSettings.get().getMistakeChance(), v -> BotSettings.get().setMistakeChance(v), 0, 100));
+        settings.then(intSetting("shield-break-chance", () -> BotSettings.get().getShieldBreakChance(), v -> BotSettings.get().setShieldBreakChance(v), 0, 100));
+        settings.then(boolSetting("retreat", () -> BotSettings.get().isRetreatEnabled(), v -> BotSettings.get().setRetreatEnabled(v)));
+        settings.then(boolSetting("auto-eat", () -> BotSettings.get().isAutoEatEnabled(), v -> BotSettings.get().setAutoEatEnabled(v)));
+        settings.then(boolSetting("auto-mend", () -> BotSettings.get().isAutoMendEnabled(), v -> BotSettings.get().setAutoMendEnabled(v)));
+        settings.then(boolSetting("bot-leave-on-death", () -> BotSettings.get().isBotLeaveOnDeath(), v -> BotSettings.get().setBotLeaveOnDeath(v)));
+        settings.then(boolSetting("attack-invincible", () -> BotSettings.get().isAttackInvincible(), v -> BotSettings.get().setAttackInvincible(v)));
+        settings.then(doubleSetting("aim-speed", () -> BotSettings.get().getAimSpeed(), v -> BotSettings.get().setAimSpeed(v), 3.0, 45.0));
+        settings.then(doubleSetting("view-distance", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0));
+
+        return settings;
     }
 
+    // ========== SETTING HELPERS ==========
 
-    private static int spawnBot(ServerCommandSource source, String name) {
+    private static LiteralArgumentBuilder<ServerCommandSource> boolSetting(String name, BooleanSupplier getter, Consumer<Boolean> setter) {
+        return CommandManager.literal(name)
+            .executes(ctx -> {
+                ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + getter.getAsBoolean()), false);
+                return 1;
+            })
+            .then(CommandManager.argument("value", BoolArgumentType.bool())
+                .executes(ctx -> {
+                    boolean value = BoolArgumentType.getBool(ctx, "value");
+                    setter.accept(value);
+                    ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + value), true);
+                    return 1;
+                }));
+    }
 
+    private static LiteralArgumentBuilder<ServerCommandSource> intSetting(String name, java.util.function.IntSupplier getter, java.util.function.IntConsumer setter, int min, int max) {
+        return CommandManager.literal(name)
+            .executes(ctx -> {
+                ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + getter.getAsInt()), false);
+                return 1;
+            })
+            .then(CommandManager.argument("value", IntegerArgumentType.integer(min, max))
+                .executes(ctx -> {
+                    int value = IntegerArgumentType.getInteger(ctx, "value");
+                    setter.accept(value);
+                    ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + value), true);
+                    return 1;
+                }));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> doubleSetting(String name, java.util.function.DoubleSupplier getter, java.util.function.DoubleConsumer setter, double min, double max) {
+        return CommandManager.literal(name)
+            .executes(ctx -> {
+                ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + getter.getAsDouble()), false);
+                return 1;
+            })
+            .then(CommandManager.argument("value", DoubleArgumentType.doubleArg(min, max))
+                .executes(ctx -> {
+                    double value = DoubleArgumentType.getDouble(ctx, "value");
+                    setter.accept(value);
+                    ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + value), true);
+                    return 1;
+                }));
+    }
+
+    // ========== COMMAND HANDLERS ==========
+
+    private static int spawn(CommandContext<ServerCommandSource> ctx, String name) {
+        var source = ctx.getSource();
+        String botName = name != null ? name : BotNameGenerator.generateUniqueName();
         var server = source.getServer();
-        var existingPlayer = server.getPlayerManager().getPlayer(name);
-        if (existingPlayer != null && !BotManager.getAllBots().contains(name)) {
-            source.sendError(Text.literal("Cannot create bot '" + name + "': a real player with this name is online!"));
+        var existingPlayer = server.getPlayerManager().getPlayer(botName);
+        if (existingPlayer != null && !BotManager.getAllBots().contains(botName)) {
+            source.sendError(Text.literal("Cannot create bot '" + botName + "': a real player with this name is online!"));
             return 0;
         }
-        
-        if (BotManager.spawnBot(server, name, source)) {
-            source.sendFeedback(() -> Text.literal("PvP Bot '" + name + "' spawned!"), true);
+        if (BotManager.spawnBot(server, botName, source)) {
+            source.sendFeedback(() -> Text.literal("PvP Bot '" + botName + "' spawned!"), true);
             return 1;
         } else {
-            source.sendError(Text.literal("Failed to spawn bot '" + name + "' (bot already exists or name is taken)"));
+            source.sendError(Text.literal("Failed to spawn bot '" + botName + "' (bot already exists or name is taken)"));
             return 0;
         }
     }
-    
-    private static int massSpawnBots(ServerCommandSource source, int count) {
-        var server = source.getServer();
-        final int[] spawned = {0};
-        final int[] current = {0};
-        
-        source.sendFeedback(() -> Text.literal("Spawning " + count + " bots "), false);
-        
 
+    private static int massSpawn(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        var server = source.getServer();
+        int count = IntegerArgumentType.getInteger(ctx, "count");
+        source.sendFeedback(() -> Text.literal("Spawning " + count + " bots "), false);
+        int[] spawned = {0};
+        int[] current = {0};
         scheduleSpawn(server, source, count, spawned, current);
-        
         return 1;
     }
-    
+
     private static void scheduleSpawn(net.minecraft.server.MinecraftServer server, ServerCommandSource source, int total, int[] spawned, int[] current) {
         if (current[0] >= total) {
             source.sendFeedback(() -> Text.literal("Finished! Spawned " + spawned[0] + " bots."), true);
             return;
         }
-        
-
         String name = BotNameGenerator.generateUniqueName();
         if (BotManager.spawnBot(server, name, source)) {
             spawned[0]++;
         }
         current[0]++;
-        
-
         server.execute(() -> {
-
-            final int[] delay = {0};
+            int[] delay = {0};
             server.execute(new Runnable() {
                 @Override
                 public void run() {
@@ -1265,7 +383,9 @@ public class BotCommand {
         });
     }
 
-    private static int removeBot(ServerCommandSource source, String name) {
+    private static int remove(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
         if (BotManager.removeBot(source.getServer(), name, source)) {
             source.sendFeedback(() -> Text.literal("Bot '" + name + "' removed!"), true);
             return 1;
@@ -1275,16 +395,156 @@ public class BotCommand {
         }
     }
 
-    private static int removeAllBots(ServerCommandSource source) {
+    private static int removeAll(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
         int count = BotManager.getBotCount();
         BotManager.removeAllBots(source.getServer(), source);
         source.sendFeedback(() -> Text.literal("Removed " + count + " bots"), true);
         return count;
     }
 
-    private static int listBots(ServerCommandSource source) {
+    private static int reload(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        var server = source.getServer();
+        BotSettings.load();
+        BotKits.reload(server);
+        BotPath.init();
+        BotManager.reloadBots();
+        source.sendFeedback(() -> Text.literal("All configurations reloaded!"), true);
+        return 1;
+    }
+
+    private static int settings(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        BotSettings s = BotSettings.get();
+        source.sendFeedback(() -> Text.literal("=== Equipment Settings ==="), false);
+        source.sendFeedback(() -> Text.literal("auto-armor: " + s.isAutoEquipArmor()), false);
+        source.sendFeedback(() -> Text.literal("auto-weapon: " + s.isAutoEquipWeapon()), false);
+        source.sendFeedback(() -> Text.literal("drop-armor: " + s.isDropWorseArmor()), false);
+        source.sendFeedback(() -> Text.literal("drop-weapon: " + s.isDropWorseWeapons()), false);
+        source.sendFeedback(() -> Text.literal("drop-distance: " + s.getDropDistance()), false);
+        source.sendFeedback(() -> Text.literal("interval: " + s.getCheckInterval() + " ticks"), false);
+        source.sendFeedback(() -> Text.literal("=== Combat Settings ==="), false);
+        source.sendFeedback(() -> Text.literal("combat: " + s.isCombatEnabled()), false);
+        source.sendFeedback(() -> Text.literal("revenge: " + s.isRevengeEnabled()), false);
+        source.sendFeedback(() -> Text.literal("auto-target: " + s.isAutoTargetEnabled()), false);
+        source.sendFeedback(() -> Text.literal("target-players: " + s.isTargetPlayers()), false);
+        source.sendFeedback(() -> Text.literal("target-mobs: " + s.isTargetHostileMobs()), false);
+        source.sendFeedback(() -> Text.literal("target-bots: " + s.isTargetOtherBots()), false);
+        source.sendFeedback(() -> Text.literal("criticals: " + s.isCriticalsEnabled()), false);
+        source.sendFeedback(() -> Text.literal("ranged: " + s.isRangedEnabled()), false);
+        source.sendFeedback(() -> Text.literal("mace: " + s.isMaceEnabled()), false);
+        source.sendFeedback(() -> Text.literal("special-names: " + s.isUseSpecialNames()), false);
+        source.sendFeedback(() -> Text.literal("shield-mace: " + s.isShieldMace()), false);
+        source.sendFeedback(() -> Text.literal("attack-cooldown: " + s.getAttackCooldown() + " ticks"), false);
+        source.sendFeedback(() -> Text.literal("melee-range: " + s.getMeleeRange()), false);
+        source.sendFeedback(() -> Text.literal("move-speed: " + s.getMoveSpeed()), false);
+        source.sendFeedback(() -> Text.literal("=== Utilities ==="), false);
+        source.sendFeedback(() -> Text.literal("auto-totem: " + s.isAutoTotemEnabled()), false);
+        source.sendFeedback(() -> Text.literal("totem-priority: " + s.isTotemPriority() + " (don't replace totem with shield)"), false);
+        source.sendFeedback(() -> Text.literal("auto-shield: " + s.isAutoShieldEnabled()), false);
+        source.sendFeedback(() -> Text.literal("auto-potion: " + s.isAutoPotionEnabled()), false);
+        source.sendFeedback(() -> Text.literal("shield-break: " + s.isShieldBreakEnabled()), false);
+        source.sendFeedback(() -> Text.literal("prefer-sword: " + s.isPreferSword()), false);
+        source.sendFeedback(() -> Text.literal("bot-leave-on-death: " + s.isBotLeaveOnDeath()), false);
+        source.sendFeedback(() -> Text.literal("attack-invincible: " + s.isAttackInvincible()), false);
+        source.sendFeedback(() -> Text.literal("aim-speed: " + s.getAimSpeed()), false);
+        source.sendFeedback(() -> Text.literal("=== Navigation Settings ==="), false);
+        source.sendFeedback(() -> Text.literal("bhop: " + s.isBhopEnabled()), false);
+
+        source.sendFeedback(() -> Text.literal("idle: " + s.isIdleWanderEnabled()), false);
+        source.sendFeedback(() -> Text.literal("idle-radius: " + s.getIdleWanderRadius()), false);
+        source.sendFeedback(() -> Text.literal("=== Factions & Mistakes ==="), false);
+        source.sendFeedback(() -> Text.literal("factions: " + s.isFactionsEnabled()), false);
+        source.sendFeedback(() -> Text.literal("friendly-fire: " + s.isFriendlyFireEnabled()), false);
+        source.sendFeedback(() -> Text.literal("miss-chance: " + s.getMissChance() + "%"), false);
+        source.sendFeedback(() -> Text.literal("mistake-chance: " + s.getMistakeChance() + "%"), false);
+        source.sendFeedback(() -> Text.literal("shield-break-chance: " + s.getShieldBreakChance() + "%"), false);
+
+        return 1;
+    }
+
+    // ========== BOT-MANAGEMENT HANDLERS ==========
+
+    private static int botAttack(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String botname = StringArgumentType.getString(ctx, "botname");
+        String target = StringArgumentType.getString(ctx, "target");
+        if (!BotManager.getAllBots().contains(botname)) {
+            source.sendError(Text.literal("Bot '" + botname + "' not found!"));
+            return 0;
+        }
+        BotCombat.setTarget(botname, target);
+        source.sendFeedback(() -> Text.literal("Bot '" + botname + "' now attacking '" + target + "'"), true);
+        return 1;
+    }
+
+    private static int botStopAttack(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String botname = StringArgumentType.getString(ctx, "botname");
+        if (!BotManager.getAllBots().contains(botname)) {
+            source.sendError(Text.literal("Bot '" + botname + "' not found!"));
+            return 0;
+        }
+        BotCombat.clearTarget(botname);
+        source.sendFeedback(() -> Text.literal("Bot '" + botname + "' stopped attacking"), true);
+        return 1;
+    }
+
+    private static int botInventory(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String botname = StringArgumentType.getString(ctx, "botname");
+        if (!BotManager.getAllBots().contains(botname)) {
+            source.sendError(Text.literal("Bot '" + botname + "' not found!"));
+            return 0;
+        }
+        var bot = source.getServer().getPlayerManager().getPlayer(botname);
+        if (bot == null) {
+            source.sendError(Text.literal("Bot '" + botname + "' not online!"));
+            return 0;
+        }
+        var inventory = bot.getInventory();
+        source.sendFeedback(() -> Text.literal("=== Inventory: " + botname + " ==="), false);
+        StringBuilder hotbar = new StringBuilder("Hotbar: ");
+        for (int i = 0; i < 9; i++) {
+            var stack = inventory.getStack(i);
+            if (!stack.isEmpty()) {
+                hotbar.append("[").append(stack.getName().getString()).append(" x").append(stack.getCount()).append("] ");
+            }
+        }
+        source.sendFeedback(() -> Text.literal(hotbar.toString().trim()), false);
+        StringBuilder mainInv = new StringBuilder("Main: ");
+        for (int i = 9; i < 36; i++) {
+            var stack = inventory.getStack(i);
+            if (!stack.isEmpty()) {
+                mainInv.append("[").append(stack.getName().getString()).append(" x").append(stack.getCount()).append("] ");
+            }
+        }
+        source.sendFeedback(() -> Text.literal(mainInv.toString().trim()), false);
+        StringBuilder armor = new StringBuilder("Armor: ");
+        for (int i = 36; i < 40; i++) {
+            var stack = inventory.getStack(i);
+            if (!stack.isEmpty()) {
+                armor.append("[").append(stack.getName().getString()).append("] ");
+            }
+        }
+        String armorStr = armor.toString().trim();
+        if (!armorStr.equals("Armor:")) {
+            source.sendFeedback(() -> Text.literal(armorStr), false);
+        }
+        var offhand = inventory.getStack(40);
+        if (!offhand.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("Offhand: [" + offhand.getName().getString() + " x" + offhand.getCount() + "]"), false);
+        }
+        source.sendFeedback(() -> Text.literal("HP: " + String.format("%.1f", bot.getHealth()) + "/" + String.format("%.1f", bot.getMaxHealth()) +
+            " | Food: " + bot.getHungerManager().getFoodLevel() +
+            " | XP: " + bot.experienceLevel), false);
+        return 1;
+    }
+
+    private static int botList(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
         var bots = BotManager.getAllBots();
-        
         if (bots.isEmpty()) {
             source.sendFeedback(() -> Text.literal("No active PvP bots"), false);
         } else {
@@ -1295,143 +555,375 @@ public class BotCommand {
         }
         return bots.size();
     }
-    
-    private static int syncBots(ServerCommandSource source) {
-        var server = source.getServer();
-        int beforeCount = BotManager.getAllBots().size();
-        
 
-        source.sendFeedback(() -> Text.literal("=== Players on server ==="), false);
-        for (var player : server.getPlayerManager().getPlayerList()) {
-            String name = player.getName().getString();
-            String className = player.getClass().getName();
-            boolean inList = BotManager.getAllBots().contains(name);
-            source.sendFeedback(() -> Text.literal(" - " + name + " [" + className + "] " + (inList ? "(in list)" : "(NOT in list)")), false);
-        }
-        
+    // ========== PATH HANDLERS ==========
 
-        BotManager.syncBots(server);
-        
-        int afterCount = BotManager.getAllBots().size();
-        int added = afterCount - beforeCount;
-        
-        source.sendFeedback(() -> Text.literal("Synced! Added " + added + " bots. Total: " + afterCount), true);
-        return added;
-    }
-    
-    private static int syncBot(ServerCommandSource source, String name) {
-        var server = source.getServer();
-        
-
-        ServerPlayerEntity player = server.getPlayerManager().getPlayer(name);
-        if (player == null) {
-            source.sendFeedback(() -> Text.literal("Player " + name + " not found on server!"), false);
-            return 0;
-        }
-        
-
-        String className = player.getClass().getName();
-        boolean inList = BotManager.getAllBots().contains(name);
-        source.sendFeedback(() -> Text.literal("Player: " + name), false);
-        source.sendFeedback(() -> Text.literal("Class: " + className), false);
-        source.sendFeedback(() -> Text.literal("In bot list: " + inList), false);
-        
-
-        boolean added = BotManager.syncBot(server, name);
-        
-        if (added) {
-            source.sendFeedback(() -> Text.literal("Successfully added " + name + " to bot list!"), true);
+    private static int pathCreate(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (BotPath.createPath(name)) {
+            BotPath.setPathVisible(name, true);
+            source.sendFeedback(() -> Text.literal("Path '" + name + "' created"), true);
+            source.sendFeedback(() -> Text.literal("Visualization enabled. To disable: /pvpbot path show " + name + " false"), false);
             return 1;
-        } else if (inList) {
-            source.sendFeedback(() -> Text.literal(name + " is already in bot list!"), false);
-            return 0;
         } else {
-            source.sendFeedback(() -> Text.literal(name + " is not a fake player (HeroBot bot)!"), false);
+            source.sendError(Text.literal("Path '" + name + "' already exists"));
             return 0;
         }
     }
 
-    private static int openSettingsGui(ServerCommandSource source) {
-        try {
-            ServerPlayerEntity player = source.getPlayer();
-            if (player == null) {
-                source.sendError(Text.literal("This command must be run by a player!"));
-                return 0;
-            }
-            
-            SettingsGui gui = new SettingsGui(player);
-            gui.open();
+    private static int pathDelete(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (BotPath.deletePath(name)) {
+            source.sendFeedback(() -> Text.literal("Path '" + name + "' deleted"), true);
             return 1;
-        } catch (Exception e) {
-            source.sendError(Text.literal("Failed to open settings GUI: " + e.getMessage()));
-            e.printStackTrace();
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
             return 0;
         }
     }
 
-    private static int showSettings(ServerCommandSource source) {
-        BotSettings s = BotSettings.get();
-        source.sendFeedback(() -> Text.literal("=== Equipment Settings ==="), false);
-        source.sendFeedback(() -> Text.literal("autoarmor: " + s.isAutoEquipArmor()), false);
-        source.sendFeedback(() -> Text.literal("autoweapon: " + s.isAutoEquipWeapon()), false);
-        source.sendFeedback(() -> Text.literal("droparmor: " + s.isDropWorseArmor()), false);
-        source.sendFeedback(() -> Text.literal("dropweapon: " + s.isDropWorseWeapons()), false);
-        source.sendFeedback(() -> Text.literal("dropdistance: " + s.getDropDistance()), false);
-        source.sendFeedback(() -> Text.literal("interval: " + s.getCheckInterval() + " ticks"), false);
-        source.sendFeedback(() -> Text.literal("minarmorlevel: " + s.getMinArmorLevel()), false);
-        
-        source.sendFeedback(() -> Text.literal("=== Combat Settings ==="), false);
-        source.sendFeedback(() -> Text.literal("combat: " + s.isCombatEnabled()), false);
-        source.sendFeedback(() -> Text.literal("revenge: " + s.isRevengeEnabled()), false);
-        source.sendFeedback(() -> Text.literal("autotarget: " + s.isAutoTargetEnabled()), false);
-        source.sendFeedback(() -> Text.literal("targetplayers: " + s.isTargetPlayers()), false);
-        source.sendFeedback(() -> Text.literal("targetmobs: " + s.isTargetHostileMobs()), false);
-        source.sendFeedback(() -> Text.literal("targetbots: " + s.isTargetOtherBots()), false);
-        source.sendFeedback(() -> Text.literal("criticals: " + s.isCriticalsEnabled()), false);
-        source.sendFeedback(() -> Text.literal("ranged: " + s.isRangedEnabled()), false);
-        source.sendFeedback(() -> Text.literal("mace: " + s.isMaceEnabled()), false);
-        source.sendFeedback(() -> Text.literal("elytramace: " + s.isElytraMaceEnabled()), false);
-        source.sendFeedback(() -> Text.literal("specialnames: " + s.isUseSpecialNames()), false);
-        source.sendFeedback(() -> Text.literal("elytramaceretries: " + s.getElytraMaceMaxRetries()), false);
-        source.sendFeedback(() -> Text.literal("elytramacealtitude: " + s.getElytraMaceMinAltitude()), false);
-        source.sendFeedback(() -> Text.literal("elytramacedistance: " + s.getElytraMaceAttackDistance()), false);
-        source.sendFeedback(() -> Text.literal("elytramacefireworks: " + s.getElytraMaceFireworkCount()), false);
-        source.sendFeedback(() -> Text.literal("gotousebaritone: " + s.isGotoUseBaritone()), false);
-        source.sendFeedback(() -> Text.literal("escortusebaritone: " + s.isEscortUseBaritone()), false);
-        source.sendFeedback(() -> Text.literal("followusebaritone: " + s.isFollowUseBaritone()), false);
-        source.sendFeedback(() -> Text.literal("shieldmace: " + s.isShieldMace()), false);
-        source.sendFeedback(() -> Text.literal("prefershieldmace: " + s.isPreferShieldMace()), false);
-        source.sendFeedback(() -> Text.literal("shieldmainhand: " + s.isShieldMainHand()), false);
-        source.sendFeedback(() -> Text.literal("attackcooldown: " + s.getAttackCooldown() + " ticks"), false);
-        source.sendFeedback(() -> Text.literal("meleerange: " + s.getMeleeRange()), false);
-        source.sendFeedback(() -> Text.literal("movespeed: " + s.getMoveSpeed()), false);
-        
-        source.sendFeedback(() -> Text.literal("=== Utilities ==="), false);
-        source.sendFeedback(() -> Text.literal("autototem: " + s.isAutoTotemEnabled()), false);
-        source.sendFeedback(() -> Text.literal("totempriority: " + s.isTotemPriority() + " (don't replace totem with shield)"), false);
-        source.sendFeedback(() -> Text.literal("autoshield: " + s.isAutoShieldEnabled()), false);
-        source.sendFeedback(() -> Text.literal("autopotion: " + s.isAutoPotionEnabled()), false);
-        source.sendFeedback(() -> Text.literal("shieldbreak: " + s.isShieldBreakEnabled()), false);
-        source.sendFeedback(() -> Text.literal("prefersword: " + s.isPreferSword()), false);
-        
-        source.sendFeedback(() -> Text.literal("=== Navigation Settings ==="), false);
-        source.sendFeedback(() -> Text.literal("bhop: " + s.isBhopEnabled()), false);
-        source.sendFeedback(() -> Text.literal("bhopcooldown: " + s.getBhopCooldown() + " ticks"), false);
-        source.sendFeedback(() -> Text.literal("jumpboost: " + s.getJumpBoost()), false);
-        source.sendFeedback(() -> Text.literal("idle: " + s.isIdleWanderEnabled()), false);
-        source.sendFeedback(() -> Text.literal("idleradius: " + s.getIdleWanderRadius()), false);
-        source.sendFeedback(() -> Text.literal("=== Factions & Mistakes ==="), false);
-        source.sendFeedback(() -> Text.literal("factions: " + s.isFactionsEnabled()), false);
-        source.sendFeedback(() -> Text.literal("friendlyfire: " + s.isFriendlyFireEnabled()), false);
-        source.sendFeedback(() -> Text.literal("misschance: " + s.getMissChance() + "%"), false);
-        source.sendFeedback(() -> Text.literal("mistakechance: " + s.getMistakeChance() + "%"), false);
-        source.sendFeedback(() -> Text.literal("reactiondelay: " + s.getReactionDelay() + " ticks"), false);
+    private static int pathAddPoint(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) {
+            source.sendError(Text.literal("Only players can add path points"));
+            return 0;
+        }
+        Vec3d pos = new Vec3d(player.getX(), player.getY(), player.getZ());
+        if (BotPath.addPoint(name, pos)) {
+            var path = BotPath.getPath(name);
+            if (!BotPath.isPathVisible(name)) {
+                BotPath.setPathVisible(name, true);
+                source.sendFeedback(() -> Text.literal("Visualization enabled. To disable: /pvpbot path show " + name + " false"), false);
+            }
+            source.sendFeedback(() -> Text.literal(String.format("Point #%d added to path '%s' at (%.1f, %.1f, %.1f)", path.points.size(), name, pos.x, pos.y, pos.z)), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+    }
+
+    private static int pathRemovePoint(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        int index = IntegerArgumentType.getInteger(ctx, "index");
+        if (BotPath.removePoint(name, index)) {
+            source.sendFeedback(() -> Text.literal("Point #" + index + " removed from path '" + name + "'"), true);
+            return 1;
+        }
+        source.sendError(Text.literal("Invalid path or index"));
+        return 0;
+    }
+
+    private static int pathRemovePointLast(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (BotPath.removeLastPoint(name)) {
+            source.sendFeedback(() -> Text.literal("Last point removed from path '" + name + "'"), true);
+            return 1;
+        }
+        source.sendError(Text.literal("Invalid path or index"));
+        return 0;
+    }
+
+    private static int pathClear(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (BotPath.clearPath(name)) {
+            source.sendFeedback(() -> Text.literal("All points cleared from path '" + name + "'"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+    }
+
+    private static int pathLoop(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        boolean value = BoolArgumentType.getBool(ctx, "value");
+        if (BotPath.setLoop(name, value)) {
+            source.sendFeedback(() -> Text.literal("Path '" + name + "' loop: " + value), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+    }
+
+    private static int pathAttack(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        boolean value = BoolArgumentType.getBool(ctx, "value");
+        if (BotPath.setAttack(name, value)) {
+            if (value) {
+                source.sendFeedback(() -> Text.literal("Path '" + name + "' attack: enabled"), true);
+            } else {
+                source.sendFeedback(() -> Text.literal("Path '" + name + "' attack: disabled"), true);
+                source.sendFeedback(() -> Text.literal("Bot will ignore attacks and continue following path"), false);
+            }
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+    }
+
+    private static int pathStart(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String bot = StringArgumentType.getString(ctx, "bot");
+        String path = StringArgumentType.getString(ctx, "path");
+        if (BotPath.startFollowing(bot, path)) {
+            source.sendFeedback(() -> Text.literal("Bot '" + bot + "' started following path '" + path + "'"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + path + "' not found or empty"));
+            return 0;
+        }
+    }
+
+    private static int pathStop(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String bot = StringArgumentType.getString(ctx, "bot");
+        if (BotPath.stopFollowing(bot)) {
+            source.sendFeedback(() -> Text.literal("Bot '" + bot + "' stopped following path"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Bot '" + bot + "' is not following any path"));
+            return 0;
+        }
+    }
+
+    private static int pathList(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        var paths = BotPath.getAllPaths();
+        if (paths.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("No paths created"), false);
+            return 0;
+        }
+        source.sendFeedback(() -> Text.literal("=== Paths ==="), false);
+        for (var entry : paths.entrySet()) {
+            String name = entry.getKey();
+            var path = entry.getValue();
+            source.sendFeedback(() -> Text.literal(String.format("%s: %d points, loop: %s, attack: %s", name, path.points.size(), path.loop, path.attack)), false);
+        }
+        return paths.size();
+    }
+
+    private static int pathShow(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        boolean visible = BoolArgumentType.getBool(ctx, "visible");
+        if (BotPath.setPathVisible(name, visible)) {
+            if (visible) {
+                source.sendFeedback(() -> Text.literal("Path '" + name + "' visualization enabled"), true);
+                source.sendFeedback(() -> Text.literal("To disable: /pvpbot path show " + name + " false"), false);
+            } else {
+                source.sendFeedback(() -> Text.literal("Path '" + name + "' visualization disabled"), true);
+            }
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+    }
+
+    private static int pathInfo(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        var path = BotPath.getPath(name);
+        if (path == null) {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+        source.sendFeedback(() -> Text.literal("=== Path: " + name + " ==="), false);
+        source.sendFeedback(() -> Text.literal("Points: " + path.points.size()), false);
+        source.sendFeedback(() -> Text.literal("Loop: " + path.loop), false);
+        source.sendFeedback(() -> Text.literal("Attack: " + path.attack), false);
+        for (int i = 0; i < path.points.size(); i++) {
+            var point = path.points.get(i);
+            int index = i;
+            source.sendFeedback(() -> Text.literal(String.format("#%d: (%.1f, %.1f, %.1f)", index, point.x, point.y, point.z)), false);
+        }
         return 1;
     }
-    
 
-    
-    private static int listFactions(ServerCommandSource source) {
+    private static int pathDistribute(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String pathName = StringArgumentType.getString(ctx, "path");
+        var path = BotPath.getPath(pathName);
+        if (path == null) {
+            source.sendError(Text.literal("Path '" + pathName + "' not found"));
+            return 0;
+        }
+        if (path.points.isEmpty()) {
+            source.sendError(Text.literal("Path '" + pathName + "' has no points"));
+            return 0;
+        }
+        var server = source.getServer();
+        var botsOnPath = new java.util.ArrayList<String>();
+        for (String botName : BotManager.getAllBots()) {
+            if (BotPath.isFollowing(botName, pathName)) {
+                botsOnPath.add(botName);
+            }
+        }
+        if (botsOnPath.isEmpty()) {
+            source.sendError(Text.literal("No bots are following path '" + pathName + "'"));
+            return 0;
+        }
+        int totalPoints = path.points.size();
+        int botCount = botsOnPath.size();
+        for (int i = 0; i < botCount; i++) {
+            String botName = botsOnPath.get(i);
+            int pointIndex = (i * totalPoints) / botCount;
+            BotPath.setBotPathIndex(botName, pointIndex);
+            var point = path.points.get(pointIndex);
+            try {
+                String tpCommand = String.format(java.util.Locale.US, "tp %s %.2f %.2f %.2f", botName, point.x, point.y + 1.0, point.z);
+                server.getCommandManager().getDispatcher().execute(tpCommand, server.getCommandSource());
+            } catch (Exception e) {
+            }
+        }
+        source.sendFeedback(() -> Text.literal("Distributed " + botCount + " bots along path '" + pathName + "'"), true);
+        return botCount;
+    }
+
+    private static int pathStartNear(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String pathName = StringArgumentType.getString(ctx, "path");
+        double radius = DoubleArgumentType.getDouble(ctx, "radius");
+        var path = BotPath.getPath(pathName);
+        if (path == null) {
+            source.sendError(Text.literal("Path '" + pathName + "' not found"));
+            return 0;
+        }
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) {
+            source.sendError(Text.literal("This command can only be used by a player"));
+            return 0;
+        }
+        var server = source.getServer();
+        int started = 0;
+        for (String botName : BotManager.getAllBots()) {
+            ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+            if (bot != null && bot.distanceTo(player) <= radius) {
+                if (BotPath.startFollowing(botName, pathName)) {
+                    started++;
+                }
+            }
+        }
+        if (started > 0) {
+            int finalStarted = started;
+            source.sendFeedback(() -> Text.literal("Started path '" + pathName + "' for " + finalStarted + " bots within " + radius + " blocks"), true);
+            return started;
+        } else {
+            source.sendError(Text.literal("No bots found within " + radius + " blocks"));
+            return 0;
+        }
+    }
+
+    private static int pathStopAll(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String pathName = StringArgumentType.getString(ctx, "path");
+        var path = BotPath.getPath(pathName);
+        if (path == null) {
+            source.sendError(Text.literal("Path '" + pathName + "' not found"));
+            return 0;
+        }
+        int stopped = 0;
+        for (String botName : BotManager.getAllBots()) {
+            if (BotPath.isFollowing(botName, pathName)) {
+                if (BotPath.stopFollowing(botName)) {
+                    stopped++;
+                }
+            }
+        }
+        if (stopped > 0) {
+            int finalStopped = stopped;
+            source.sendFeedback(() -> Text.literal("Stopped " + finalStopped + " bots on path '" + pathName + "'"), true);
+            return stopped;
+        } else {
+            source.sendError(Text.literal("No bots are following path '" + pathName + "'"));
+            return 0;
+        }
+    }
+
+    // ========== KIT HANDLERS ==========
+
+    private static int kitCreate(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        var player = source.getPlayer();
+        if (player == null) {
+            source.sendError(Text.literal("This command must be run by a player!"));
+            return 0;
+        }
+        if (BotKits.kitExists(name)) {
+            source.sendError(Text.literal("Kit '" + name + "' already exists!"));
+            return 0;
+        }
+        if (BotKits.createKit(name, player)) {
+            source.sendFeedback(() -> Text.literal("Kit '" + name + "' created from your inventory!"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Failed to create kit (empty inventory?)"));
+            return 0;
+        }
+    }
+
+    private static int kitDelete(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (BotKits.deleteKit(name)) {
+            source.sendFeedback(() -> Text.literal("Kit '" + name + "' deleted!"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Kit '" + name + "' not found!"));
+            return 0;
+        }
+    }
+
+    private static int kitGive(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String playername = StringArgumentType.getString(ctx, "playername");
+        String kitname = StringArgumentType.getString(ctx, "kitname");
+        if (!BotKits.kitExists(kitname)) {
+            source.sendError(Text.literal("Kit '" + kitname + "' not found!"));
+            return 0;
+        }
+        var player = source.getServer().getPlayerManager().getPlayer(playername);
+        if (player == null) {
+            source.sendError(Text.literal("Player '" + playername + "' not found!"));
+            return 0;
+        }
+        if (BotKits.giveKit(kitname, player)) {
+            source.sendFeedback(() -> Text.literal("Gave kit '" + kitname + "' to '" + playername + "'"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Failed to give kit!"));
+            return 0;
+        }
+    }
+
+    private static int kitList(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        var kits = BotKits.getKitNames();
+        if (kits.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("No kits created. Use /pvpbot kit create-kit <name> to create one."), false);
+        } else {
+            source.sendFeedback(() -> Text.literal("Kits (" + kits.size() + "): " + String.join(", ", kits)), false);
+        }
+        return 1;
+    }
+
+    // ========== FACTION HANDLERS ==========
+
+    private static int factionList(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
         var factions = BotFaction.getAllFactions();
         if (factions.isEmpty()) {
             source.sendFeedback(() -> Text.literal("No factions created"), false);
@@ -1445,8 +937,10 @@ public class BotCommand {
         }
         return factions.size();
     }
-    
-    private static int createFaction(ServerCommandSource source, String name) {
+
+    private static int factionCreate(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
         if (BotFaction.createFaction(name)) {
             source.sendFeedback(() -> Text.literal("Faction '" + name + "' created!"), true);
             return 1;
@@ -1455,8 +949,10 @@ public class BotCommand {
             return 0;
         }
     }
-    
-    private static int deleteFaction(ServerCommandSource source, String name) {
+
+    private static int factionDelete(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
         if (BotFaction.deleteFaction(name)) {
             source.sendFeedback(() -> Text.literal("Faction '" + name + "' deleted!"), true);
             return 1;
@@ -1465,8 +961,11 @@ public class BotCommand {
             return 0;
         }
     }
-    
-    private static int addToFaction(ServerCommandSource source, String faction, String player) {
+
+    private static int factionAdd(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        String player = StringArgumentType.getString(ctx, "player");
         if (BotFaction.addMember(faction, player)) {
             source.sendFeedback(() -> Text.literal("Added '" + player + "' to faction '" + faction + "'"), true);
             return 1;
@@ -1475,8 +974,11 @@ public class BotCommand {
             return 0;
         }
     }
-    
-    private static int removeFromFaction(ServerCommandSource source, String faction, String player) {
+
+    private static int factionRemove(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        String player = StringArgumentType.getString(ctx, "player");
         if (BotFaction.removeMember(faction, player)) {
             source.sendFeedback(() -> Text.literal("Removed '" + player + "' from faction '" + faction + "'"), true);
             return 1;
@@ -1485,10 +987,13 @@ public class BotCommand {
             return 0;
         }
     }
-    
-    private static int setHostile(ServerCommandSource source, String faction1, String faction2, boolean hostile) {
-        if (BotFaction.setHostile(faction1, faction2, hostile)) {
-            if (hostile) {
+
+    private static int factionHostile(CommandContext<ServerCommandSource> ctx, boolean isHostile) {
+        var source = ctx.getSource();
+        String faction1 = StringArgumentType.getString(ctx, "faction1");
+        String faction2 = StringArgumentType.getString(ctx, "faction2");
+        if (BotFaction.setHostile(faction1, faction2, isHostile)) {
+            if (isHostile) {
                 source.sendFeedback(() -> Text.literal("Factions '" + faction1 + "' and '" + faction2 + "' are now hostile!"), true);
             } else {
                 source.sendFeedback(() -> Text.literal("Factions '" + faction1 + "' and '" + faction2 + "' are now neutral"), true);
@@ -1499,38 +1004,38 @@ public class BotCommand {
             return 0;
         }
     }
-    
-    private static int factionInfo(ServerCommandSource source, String faction) {
+
+    private static int factionInfo(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
         var members = BotFaction.getMembers(faction);
         var enemies = BotFaction.getHostileFactions(faction);
-        
         if (members.isEmpty() && enemies.isEmpty() && !BotFaction.getAllFactions().contains(faction)) {
             source.sendError(Text.literal("Faction '" + faction + "' not found!"));
             return 0;
         }
-        
         source.sendFeedback(() -> Text.literal("=== Faction: " + faction + " ==="), false);
         source.sendFeedback(() -> Text.literal("Members (" + members.size() + "): " + String.join(", ", members)), false);
         source.sendFeedback(() -> Text.literal("Hostile to (" + enemies.size() + "): " + String.join(", ", enemies)), false);
         return 1;
     }
-    
-    private static int addNearbyBotsToFaction(ServerCommandSource source, String faction, double radius) {
+
+    private static int factionAddNear(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        double radius = DoubleArgumentType.getDouble(ctx, "radius");
         if (!BotFaction.getAllFactions().contains(faction)) {
             source.sendError(Text.literal("Faction '" + faction + "' not found!"));
             return 0;
         }
-        
         var entity = source.getEntity();
         if (entity == null) {
             source.sendError(Text.literal("This command must be run by a player!"));
             return 0;
         }
-        
         int count = 0;
         var allBots = BotManager.getAllBots();
         var server = source.getServer();
-        
         for (String botName : allBots) {
             var bot = server.getPlayerManager().getPlayer(botName);
             if (bot != null && bot.distanceTo(entity) <= radius) {
@@ -1538,710 +1043,113 @@ public class BotCommand {
                 count++;
             }
         }
-        
-        final int added = count;
-        source.sendFeedback(() -> Text.literal("Added " + added + " bots to faction '" + faction + "'"), true);
+        int finalCount = count;
+        source.sendFeedback(() -> Text.literal("Added " + finalCount + " bots to faction '" + faction + "'"), true);
         return count;
     }
-    
-    private static int addAllBotsToFaction(ServerCommandSource source, String faction) {
+
+    private static int factionAddAll(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
         if (!BotFaction.getAllFactions().contains(faction)) {
             source.sendError(Text.literal("Faction '" + faction + "' not found!"));
             return 0;
         }
-        
         var allBots = BotManager.getAllBots();
         int count = 0;
-        
         for (String botName : allBots) {
             BotFaction.addMember(faction, botName);
             count++;
         }
-        
-        final int added = count;
-        source.sendFeedback(() -> Text.literal("Added " + added + " bots to faction '" + faction + "'"), true);
+        int finalCount = count;
+        source.sendFeedback(() -> Text.literal("Added " + finalCount + " bots to faction '" + faction + "'"), true);
         return count;
     }
-    
-    private static int showInventory(ServerCommandSource source, String botName) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("Bot '" + botName + "' not found!"));
-            return 0;
-        }
-        
-        var bot = source.getServer().getPlayerManager().getPlayer(botName);
-        if (bot == null) {
-            source.sendError(Text.literal("Bot '" + botName + "' not online!"));
-            return 0;
-        }
-        
 
-        if (HAS_INVVIEW) {
-            try {
-                return openInvViewGui(source, bot);
-            } catch (Exception e) {
-                source.sendError(Text.literal("Failed to open InvView GUI: " + e.getMessage()));
-                return 0;
-            }
-        }
-        
-
-        source.sendError(Text.literal("InvView mod is not installed!"));
-        source.sendFeedback(() -> Text.literal("Please install InvView to view bot inventories: https://modrinth.com/mod/invview"), false);
-        return 0;
-    }
-    
-    
-    private static int openInvViewGui(ServerCommandSource source, ServerPlayerEntity targetPlayer) throws Exception {
-        ServerPlayerEntity viewer = source.getPlayer();
-        if (viewer == null) {
-            source.sendError(Text.literal("This command must be run by a player!"));
-            return 0;
-        }
-        
-
-        Class<?> simpleGuiClass = Class.forName("eu.pb4.sgui.api.gui.SimpleGui");
-        Class<?> savingGuiClass = Class.forName("us.potatoboy.invview.gui.SavingPlayerDataGui");
-        
-
-        Object screenHandlerType = net.minecraft.screen.ScreenHandlerType.GENERIC_9X5;
-        
-
-        Object gui = savingGuiClass.getConstructor(
-                net.minecraft.screen.ScreenHandlerType.class, 
-                ServerPlayerEntity.class, 
-                ServerPlayerEntity.class)
-                .newInstance(screenHandlerType, viewer, targetPlayer);
-        
-
-        Method setTitleMethod = simpleGuiClass.getMethod("setTitle", Text.class);
-        setTitleMethod.invoke(gui, targetPlayer.getName());
-        
-
-        Method setSlotRedirectMethod = simpleGuiClass.getMethod("setSlotRedirect", int.class, net.minecraft.screen.slot.Slot.class);
-        var inventory = targetPlayer.getInventory();
-        
-        for (int i = 0; i < inventory.size(); i++) {
-
-            net.minecraft.screen.slot.Slot slot = new net.minecraft.screen.slot.Slot(inventory, i, 0, 0);
-            setSlotRedirectMethod.invoke(gui, i, slot);
-        }
-        
-
-        Method openMethod = simpleGuiClass.getMethod("open");
-        openMethod.invoke(gui);
-        
-        return 1;
-    }
-    
-    private static int giveFactionItem(ServerCommandSource source, String faction, String itemCommand) {
+    private static int factionGive(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        String itemCommand = StringArgumentType.getString(ctx, "item");
         if (!BotFaction.getAllFactions().contains(faction)) {
             source.sendError(Text.literal("Faction '" + faction + "' not found!"));
             return 0;
         }
-        
         var members = BotFaction.getMembers(faction);
         var server = source.getServer();
         int count = 0;
-        
         for (String memberName : members) {
-
             try {
-                server.getCommandManager().getDispatcher().execute(
-                    "give " + memberName + " " + itemCommand,
-                    server.getCommandSource()
-                );
+                server.getCommandManager().getDispatcher().execute("give " + memberName + " " + itemCommand, server.getCommandSource());
                 count++;
             } catch (Exception e) {
-
             }
         }
-        
-        final int given = count;
-        source.sendFeedback(() -> Text.literal("Gave items to " + given + " members of faction '" + faction + "'"), true);
+        int finalCount = count;
+        source.sendFeedback(() -> Text.literal("Gave items to " + finalCount + " members of faction '" + faction + "'"), true);
         return count;
     }
-    
-    private static int factionAttack(ServerCommandSource source, String faction, String targetName) {
+
+    private static int factionAttack(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        String target = StringArgumentType.getString(ctx, "target");
         if (!BotFaction.getAllFactions().contains(faction)) {
             source.sendError(Text.literal("Faction '" + faction + "' not found!"));
             return 0;
         }
-        
         var members = BotFaction.getMembers(faction);
         int count = 0;
-        
         for (String memberName : members) {
-
             if (BotManager.getAllBots().contains(memberName)) {
-                BotCombat.setTarget(memberName, targetName);
+                BotCombat.setTarget(memberName, target);
                 count++;
             }
         }
-        
-        final int attacking = count;
-        source.sendFeedback(() -> Text.literal("Faction '" + faction + "' (" + attacking + " bots) attacking " + targetName + "!"), true);
+        int finalCount = count;
+        source.sendFeedback(() -> Text.literal("Faction '" + faction + "' (" + finalCount + " bots) attacking " + target + "!"), true);
         return count;
     }
-    
 
-    
-    private static int createKit(ServerCommandSource source, String kitName) {
-        var player = source.getPlayer();
-        if (player == null) {
-            source.sendError(Text.literal("This command must be run by a player!"));
-            return 0;
-        }
-        
-        if (BotKits.kitExists(kitName)) {
-            source.sendError(Text.literal("Kit '" + kitName + "' already exists!"));
-            return 0;
-        }
-        
-        if (BotKits.createKit(kitName, player)) {
-            source.sendFeedback(() -> Text.literal("Kit '" + kitName + "' created from your inventory!"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("Failed to create kit (empty inventory?)"));
-            return 0;
-        }
-    }
-    
-    private static int deleteKit(ServerCommandSource source, String kitName) {
-        if (BotKits.deleteKit(kitName)) {
-            source.sendFeedback(() -> Text.literal("Kit '" + kitName + "' deleted!"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("Kit '" + kitName + "' not found!"));
-            return 0;
-        }
-    }
-    
-    private static int listKits(ServerCommandSource source) {
-        var kits = BotKits.getKitNames();
-        if (kits.isEmpty()) {
-            source.sendFeedback(() -> Text.literal("No kits created. Use /pvpbot createkit <name> to create one."), false);
-        } else {
-            source.sendFeedback(() -> Text.literal("Kits (" + kits.size() + "): " + String.join(", ", kits)), false);
-        }
-        return 1;
-    }
-    
-    private static int giveKitToPlayer(ServerCommandSource source, String playerName, String kitName) {
-        if (!BotKits.kitExists(kitName)) {
-            source.sendError(Text.literal("Kit '" + kitName + "' not found!"));
-            return 0;
-        }
-        
-
-        var player = source.getServer().getPlayerManager().getPlayer(playerName);
-        if (player == null) {
-            source.sendError(Text.literal("Player '" + playerName + "' not found!"));
-            return 0;
-        }
-        
-        if (BotKits.giveKit(kitName, player)) {
-            source.sendFeedback(() -> Text.literal("Gave kit '" + kitName + "' to '" + playerName + "'"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("Failed to give kit!"));
-            return 0;
-        }
-    }
-    
-    private static int giveKitToFaction(ServerCommandSource source, String factionName, String kitName) {
-        if (!BotFaction.getAllFactions().contains(factionName)) {
-            source.sendError(Text.literal("Faction '" + factionName + "' not found!"));
-            return 0;
-        }
-        
-        if (!BotKits.kitExists(kitName)) {
-            source.sendError(Text.literal("Kit '" + kitName + "' not found!"));
-            return 0;
-        }
-        
-        var members = BotFaction.getMembers(factionName);
-        if (members == null || members.isEmpty()) {
-            source.sendError(Text.literal("Faction '" + factionName + "' has no members!"));
-            return 0;
-        }
-        
-        int count = 0;
-        for (String memberName : members) {
-
-            if (BotManager.getAllBots().contains(memberName)) {
-                var bot = BotManager.getBot(source.getServer(), memberName);
-                if (bot != null && BotKits.giveKit(kitName, bot)) {
-                    count++;
-                }
-            }
-        }
-        
-        final int given = count;
-        source.sendFeedback(() -> Text.literal("Gave kit '" + kitName + "' to " + given + " bots in faction '" + factionName + "'"), true);
-        return 1;
-    }
-    
-    
-    private static int openTestMenu(ServerCommandSource source) {
-        try {
-            ServerPlayerEntity player = source.getPlayer();
-            if (player == null) {
-                source.sendError(Text.literal("This command must be run by a player!"));
-                return 0;
-            }
-            
-
-            org.stepan1411.pvp_bot.gui.BotMenuGui.openMainMenu(player);
-            return 1;
-        } catch (Exception e) {
-            source.sendError(Text.literal("Failed to open menu: " + e.getMessage()));
-            e.printStackTrace();
-            return 0;
-        }
-    }
-    
-    
-    private static int updateStats(ServerCommandSource source) {
-        try {
-            StatsReporter.sendStats();
-            source.sendFeedback(() -> Text.literal("Statistics sent to server!"), true);
-            return 1;
-        } catch (Exception e) {
-            source.sendError(Text.literal("Failed to send statistics: " + e.getMessage()));
-            return 0;
-        }
-    }
-    
-
-    
-    private static int toggleDebugPath(ServerCommandSource source, String botName) {
-        var settings = BotDebug.getSettings(botName);
-        boolean newValue = !settings.pathVisualization;
-        BotDebug.setPathVisualization(botName, newValue);
-        source.sendFeedback(() -> Text.literal("Path visualization for " + botName + ": " + newValue), true);
-        return newValue ? 1 : 0;
-    }
-    
-    private static int setDebugPath(ServerCommandSource source, String botName, boolean enabled) {
-        BotDebug.setPathVisualization(botName, enabled);
-        source.sendFeedback(() -> Text.literal("Path visualization for " + botName + ": " + enabled), true);
-        return enabled ? 1 : 0;
-    }
-    
-    private static int toggleDebugTarget(ServerCommandSource source, String botName) {
-        var settings = BotDebug.getSettings(botName);
-        boolean newValue = !settings.targetVisualization;
-        BotDebug.setTargetVisualization(botName, newValue);
-        source.sendFeedback(() -> Text.literal("Target visualization for " + botName + ": " + newValue), true);
-        return newValue ? 1 : 0;
-    }
-    
-    private static int setDebugTarget(ServerCommandSource source, String botName, boolean enabled) {
-        BotDebug.setTargetVisualization(botName, enabled);
-        source.sendFeedback(() -> Text.literal("Target visualization for " + botName + ": " + enabled), true);
-        return enabled ? 1 : 0;
-    }
-    
-    private static int toggleDebugCombat(ServerCommandSource source, String botName) {
-        var settings = BotDebug.getSettings(botName);
-        boolean newValue = !settings.combatInfo;
-        BotDebug.setCombatInfo(botName, newValue);
-        source.sendFeedback(() -> Text.literal("Combat info for " + botName + ": " + newValue), true);
-        return newValue ? 1 : 0;
-    }
-    
-    private static int setDebugCombat(ServerCommandSource source, String botName, boolean enabled) {
-        BotDebug.setCombatInfo(botName, enabled);
-        source.sendFeedback(() -> Text.literal("Combat info for " + botName + ": " + enabled), true);
-        return enabled ? 1 : 0;
-    }
-    
-    private static int toggleDebugNavigation(ServerCommandSource source, String botName) {
-        var settings = BotDebug.getSettings(botName);
-        boolean newValue = !settings.navigationInfo;
-        BotDebug.setNavigationInfo(botName, newValue);
-        source.sendFeedback(() -> Text.literal("Navigation info for " + botName + ": " + newValue), true);
-        return newValue ? 1 : 0;
-    }
-    
-    private static int setDebugNavigation(ServerCommandSource source, String botName, boolean enabled) {
-        BotDebug.setNavigationInfo(botName, enabled);
-        source.sendFeedback(() -> Text.literal("Navigation info for " + botName + ": " + enabled), true);
-        return enabled ? 1 : 0;
-    }
-    
-    private static int toggleDebugAll(ServerCommandSource source, String botName) {
-        var settings = BotDebug.getSettings(botName);
-        boolean newValue = !settings.isAnyEnabled();
-        if (newValue) {
-            BotDebug.enableAll(botName);
-        } else {
-            BotDebug.disableAll(botName);
-        }
-        source.sendFeedback(() -> Text.literal("All debug modes for " + botName + ": " + newValue), true);
-        return newValue ? 1 : 0;
-    }
-    
-    private static int setDebugAll(ServerCommandSource source, String botName, boolean enabled) {
-        if (enabled) {
-            BotDebug.enableAll(botName);
-        } else {
-            BotDebug.disableAll(botName);
-        }
-        source.sendFeedback(() -> Text.literal("All debug modes for " + botName + ": " + enabled), true);
-        return enabled ? 1 : 0;
-    }
-    
-    private static int showDebugStatus(ServerCommandSource source, String botName) {
-        var settings = BotDebug.getSettings(botName);
-        source.sendFeedback(() -> Text.literal("=== Debug Status for " + botName + " ==="), false);
-        source.sendFeedback(() -> Text.literal("Path visualization: " + settings.pathVisualization), false);
-        source.sendFeedback(() -> Text.literal("Target visualization: " + settings.targetVisualization), false);
-        source.sendFeedback(() -> Text.literal("Combat info: " + settings.combatInfo), false);
-        source.sendFeedback(() -> Text.literal("Navigation info: " + settings.navigationInfo), false);
-        return 1;
-    }
-    
-
-    
-    private static int createPath(ServerCommandSource source, String name) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.createPath(name)) {
-
-            org.stepan1411.pvp_bot.bot.BotPath.setPathVisible(name, true);
-            source.sendFeedback(() -> Text.literal("§aPath '" + name + "' created"), true);
-            source.sendFeedback(() -> Text.literal("§7Visualization enabled. To disable: §e/pvpbot path show " + name + " false"), false);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' already exists"));
-            return 0;
-        }
-    }
-    
-    private static int deletePath(ServerCommandSource source, String name) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.deletePath(name)) {
-            source.sendFeedback(() -> Text.literal("§aPath '" + name + "' deleted"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-    }
-    
-    private static int addPathPoint(ServerCommandSource source, String name) {
-        ServerPlayerEntity player = source.getPlayer();
-        if (player == null) {
-            source.sendError(Text.literal("§cOnly players can add path points"));
-            return 0;
-        }
-        
-        net.minecraft.util.math.Vec3d pos = new net.minecraft.util.math.Vec3d(player.getX(), player.getY(), player.getZ());
-        if (org.stepan1411.pvp_bot.bot.BotPath.addPoint(name, pos)) {
-            var path = org.stepan1411.pvp_bot.bot.BotPath.getPath(name);
-
-            if (!org.stepan1411.pvp_bot.bot.BotPath.isPathVisible(name)) {
-                org.stepan1411.pvp_bot.bot.BotPath.setPathVisible(name, true);
-                source.sendFeedback(() -> Text.literal("§7Visualization enabled. To disable: §e/pvpbot path show " + name + " false"), false);
-            }
-            source.sendFeedback(() -> Text.literal(String.format("§aPoint #%d added to path '%s' at (%.1f, %.1f, %.1f)", 
-                path.points.size(), name, pos.x, pos.y, pos.z)), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-    }
-    
-    private static int removeLastPathPoint(ServerCommandSource source, String name) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.removeLastPoint(name)) {
-            source.sendFeedback(() -> Text.literal("§aLast point removed from path '" + name + "'"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found or empty"));
-            return 0;
-        }
-    }
-    
-    private static int removePathPoint(ServerCommandSource source, String name, int index) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.removePoint(name, index)) {
-            source.sendFeedback(() -> Text.literal("§aPoint #" + index + " removed from path '" + name + "'"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cInvalid path or index"));
-            return 0;
-        }
-    }
-    
-    private static int clearPath(ServerCommandSource source, String name) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.clearPath(name)) {
-            source.sendFeedback(() -> Text.literal("§aAll points cleared from path '" + name + "'"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-    }
-    
-    private static int setPathLoop(ServerCommandSource source, String name, boolean loop) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.setLoop(name, loop)) {
-            source.sendFeedback(() -> Text.literal("§aPath '" + name + "' loop: " + loop), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-    }
-    
-    private static int setPathAttack(ServerCommandSource source, String name, boolean attack) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.setAttack(name, attack)) {
-            if (attack) {
-                source.sendFeedback(() -> Text.literal("§aPath '" + name + "' attack: enabled"), true);
-            } else {
-                source.sendFeedback(() -> Text.literal("§aPath '" + name + "' attack: disabled"), true);
-                source.sendFeedback(() -> Text.literal("§7Bot will ignore attacks and continue following path"), false);
-            }
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-    }
-    
-    private static int startPathFollowing(ServerCommandSource source, String botName, String pathName) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.startFollowing(botName, pathName)) {
-            source.sendFeedback(() -> Text.literal("§aBot '" + botName + "' started following path '" + pathName + "'"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + pathName + "' not found or empty"));
-            return 0;
-        }
-    }
-    
-    private static int stopPathFollowing(ServerCommandSource source, String botName) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.stopFollowing(botName)) {
-            source.sendFeedback(() -> Text.literal("§aBot '" + botName + "' stopped following path"), true);
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cBot '" + botName + "' is not following any path"));
-            return 0;
-        }
-    }
-    
-    private static int listPaths(ServerCommandSource source) {
-        var paths = org.stepan1411.pvp_bot.bot.BotPath.getAllPaths();
-        if (paths.isEmpty()) {
-            source.sendFeedback(() -> Text.literal("§eNo paths created"), false);
-            return 0;
-        }
-        
-        source.sendFeedback(() -> Text.literal("§6=== Paths ==="), false);
-        for (var entry : paths.entrySet()) {
-            String name = entry.getKey();
-            var path = entry.getValue();
-            source.sendFeedback(() -> Text.literal(String.format("§e%s§7: %d points, loop: %s, attack: %s", 
-                name, path.points.size(), path.loop, path.attack)), false);
-        }
-        return paths.size();
-    }
-    
-    private static int pathInfo(ServerCommandSource source, String name) {
-        var path = org.stepan1411.pvp_bot.bot.BotPath.getPath(name);
-        if (path == null) {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-        
-        source.sendFeedback(() -> Text.literal("§6=== Path: " + name + " ==="), false);
-        source.sendFeedback(() -> Text.literal("§7Points: " + path.points.size()), false);
-        source.sendFeedback(() -> Text.literal("§7Loop: " + path.loop), false);
-        source.sendFeedback(() -> Text.literal("§7Attack: " + path.attack), false);
-        
-        for (int i = 0; i < path.points.size(); i++) {
-            var point = path.points.get(i);
-            int index = i;
-            source.sendFeedback(() -> Text.literal(String.format("§e#%d§7: (%.1f, %.1f, %.1f)", 
-                index, point.x, point.y, point.z)), false);
-        }
-        
-        return 1;
-    }
-    
-    private static int showPath(ServerCommandSource source, String name, boolean visible) {
-        if (org.stepan1411.pvp_bot.bot.BotPath.setPathVisible(name, visible)) {
-            if (visible) {
-                source.sendFeedback(() -> Text.literal("§aPath '" + name + "' visualization enabled"), true);
-                source.sendFeedback(() -> Text.literal("§7To disable: §e/pvpbot path show " + name + " false"), false);
-            } else {
-                source.sendFeedback(() -> Text.literal("§aPath '" + name + "' visualization disabled"), true);
-            }
-            return 1;
-        } else {
-            source.sendError(Text.literal("§cPath '" + name + "' not found"));
-            return 0;
-        }
-    }
-    
-
-    
-    private static int distributeBotsOnPath(ServerCommandSource source, String pathName) {
-        var path = BotPath.getPath(pathName);
-        if (path == null) {
-            source.sendError(Text.literal("§cPath '" + pathName + "' not found"));
-            return 0;
-        }
-        
-        if (path.points.isEmpty()) {
-            source.sendError(Text.literal("§cPath '" + pathName + "' has no points"));
-            return 0;
-        }
-        
-
-        var server = source.getServer();
-        var botsOnPath = new java.util.ArrayList<String>();
-        for (String botName : BotManager.getAllBots()) {
-            if (BotPath.isFollowing(botName, pathName)) {
-                botsOnPath.add(botName);
-            }
-        }
-        
-        if (botsOnPath.isEmpty()) {
-            source.sendError(Text.literal("§cNo bots are following path '" + pathName + "'"));
-            return 0;
-        }
-        
-
-        int totalPoints = path.points.size();
-        int botCount = botsOnPath.size();
-        
-        for (int i = 0; i < botCount; i++) {
-            String botName = botsOnPath.get(i);
-            int pointIndex = (i * totalPoints) / botCount;
-            
-
-            BotPath.setBotPathIndex(botName, pointIndex);
-            
-
-            var point = path.points.get(pointIndex);
-            try {
-                String tpCommand = String.format(java.util.Locale.US,
-                    "tp %s %.2f %.2f %.2f",
-                    botName, point.x, point.y + 1.0, point.z
-                );
-                server.getCommandManager().getDispatcher().execute(tpCommand, server.getCommandSource());
-            } catch (Exception e) {
-
-            }
-        }
-        
-        source.sendFeedback(() -> Text.literal("§aDistributed " + botCount + " bots along path '" + pathName + "'"), true);
-        return botCount;
-    }
-    
-    private static int startPathNear(ServerCommandSource source, String pathName, double radius) {
-        var path = BotPath.getPath(pathName);
-        if (path == null) {
-            source.sendError(Text.literal("§cPath '" + pathName + "' not found"));
-            return 0;
-        }
-        
-        ServerPlayerEntity player = source.getPlayer();
-        if (player == null) {
-            source.sendError(Text.literal("§cThis command can only be used by a player"));
-            return 0;
-        }
-        
-        var server = source.getServer();
-        int started = 0;
-        
-        for (String botName : BotManager.getAllBots()) {
-            ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
-            if (bot != null) {
-                double distance = bot.distanceTo(player);
-                if (distance <= radius) {
-                    if (BotPath.startFollowing(botName, pathName)) {
-                        started++;
-                    }
-                }
-            }
-        }
-        
-        if (started > 0) {
-            int finalStarted = started;
-            source.sendFeedback(() -> Text.literal("§aStarted path '" + pathName + "' for " + finalStarted + " bots within " + radius + " blocks"), true);
-            return started;
-        } else {
-            source.sendError(Text.literal("§cNo bots found within " + radius + " blocks"));
-            return 0;
-        }
-    }
-    
-    private static int stopAllOnPath(ServerCommandSource source, String pathName) {
-        var path = BotPath.getPath(pathName);
-        if (path == null) {
-            source.sendError(Text.literal("§cPath '" + pathName + "' not found"));
-            return 0;
-        }
-        
-        int stopped = 0;
-        for (String botName : BotManager.getAllBots()) {
-            if (BotPath.isFollowing(botName, pathName)) {
-                if (BotPath.stopFollowing(botName)) {
-                    stopped++;
-                }
-            }
-        }
-        
-        if (stopped > 0) {
-            int finalStopped = stopped;
-            source.sendFeedback(() -> Text.literal("§aStopped " + finalStopped + " bots on path '" + pathName + "'"), true);
-            return stopped;
-        } else {
-            source.sendError(Text.literal("§cNo bots are following path '" + pathName + "'"));
-            return 0;
-        }
-    }
-    
-
-    
-    private static int factionStartPath(ServerCommandSource source, String factionName, String pathName) {
-        var members = BotFaction.getMembers(factionName);
+    private static int factionStartPath(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        String path = StringArgumentType.getString(ctx, "path");
+        var members = BotFaction.getMembers(faction);
         if (members.isEmpty()) {
-            source.sendError(Text.literal("§cFaction '" + factionName + "' not found or has no members"));
+            source.sendError(Text.literal("Faction '" + faction + "' not found or has no members"));
             return 0;
         }
-        
-        var path = BotPath.getPath(pathName);
-        if (path == null) {
-            source.sendError(Text.literal("§cPath '" + pathName + "' not found"));
+        var botPath = BotPath.getPath(path);
+        if (botPath == null) {
+            source.sendError(Text.literal("Path '" + path + "' not found"));
             return 0;
         }
-        
         int started = 0;
         for (String member : members) {
             if (BotManager.getAllBots().contains(member)) {
-                if (BotPath.startFollowing(member, pathName)) {
+                if (BotPath.startFollowing(member, path)) {
                     started++;
                 }
             }
         }
-        
         if (started > 0) {
             int finalStarted = started;
-            source.sendFeedback(() -> Text.literal("§aStarted path '" + pathName + "' for " + finalStarted + " bots in faction '" + factionName + "'"), true);
+            source.sendFeedback(() -> Text.literal("Started path '" + path + "' for " + finalStarted + " bots in faction '" + faction + "'"), true);
             return started;
         } else {
-            source.sendError(Text.literal("§cNo bots in faction '" + factionName + "'"));
+            source.sendError(Text.literal("No bots in faction '" + faction + "'"));
             return 0;
         }
     }
-    
-    private static int factionStopPath(ServerCommandSource source, String factionName) {
-        var members = BotFaction.getMembers(factionName);
+
+    private static int factionStopPath(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        var members = BotFaction.getMembers(faction);
         if (members.isEmpty()) {
-            source.sendError(Text.literal("§cFaction '" + factionName + "' not found or has no members"));
+            source.sendError(Text.literal("Faction '" + faction + "' not found or has no members"));
             return 0;
         }
-        
         int stopped = 0;
         for (String member : members) {
             if (BotManager.getAllBots().contains(member)) {
@@ -2250,157 +1158,44 @@ public class BotCommand {
                 }
             }
         }
-        
         if (stopped > 0) {
             int finalStopped = stopped;
-            source.sendFeedback(() -> Text.literal("§aStopped path for " + finalStopped + " bots in faction '" + factionName + "'"), true);
+            source.sendFeedback(() -> Text.literal("Stopped path for " + finalStopped + " bots in faction '" + faction + "'"), true);
             return stopped;
         } else {
-            source.sendError(Text.literal("§cNo bots in faction '" + factionName + "' were following a path"));
+            source.sendError(Text.literal("No bots in faction '" + faction + "' were following a path"));
             return 0;
         }
     }
-    
 
-    private static int setBotFollow(ServerCommandSource source, String botName, String targetName, boolean escort) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("§cBot '" + botName + "' not found"));
+    private static int factionGiveKit(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        String kitname = StringArgumentType.getString(ctx, "kitname");
+        if (!BotFaction.getAllFactions().contains(faction)) {
+            source.sendError(Text.literal("Faction '" + faction + "' not found!"));
             return 0;
         }
-        
-
-        BotMovement.setFollow(botName, targetName, escort);
-        
-        String mode = escort ? "escorting" : "following";
-        source.sendFeedback(() -> Text.literal("§aBot '" + botName + "' is now " + mode + " '" + targetName + "'"), true);
-        return 1;
-    }
-    
-
-    private static int stopBotMovement(ServerCommandSource source, String botName) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("§cBot '" + botName + "' not found"));
+        if (!BotKits.kitExists(kitname)) {
+            source.sendError(Text.literal("Kit '" + kitname + "' not found!"));
             return 0;
         }
-        
-        BotMovement.stop(botName);
-        source.sendFeedback(() -> Text.literal("§aBot '" + botName + "' movement stopped"), true);
-        return 1;
-    }
-    
-
-    private static int setBotGoto(ServerCommandSource source, String botName, double x, double y, double z) {
-        if (!BotManager.getAllBots().contains(botName)) {
-            source.sendError(Text.literal("§cBot '" + botName + "' not found"));
+        var members = BotFaction.getMembers(faction);
+        if (members == null || members.isEmpty()) {
+            source.sendError(Text.literal("Faction '" + faction + "' has no members!"));
             return 0;
         }
-        
-
-        Vec3d targetPos = new Vec3d(x, y, z);
-        BotMovement.setGoto(botName, targetPos);
-        
-        source.sendFeedback(() -> Text.literal("§aBot '" + botName + "' is moving to " + 
-            String.format("%.1f %.1f %.1f", x, y, z)), true);
-        return 1;
-    }
-    
-
-    private static int factionFollow(ServerCommandSource source, String factionName, String targetName, boolean escort) {
-        var members = BotFaction.getMembers(factionName);
-        if (members.isEmpty()) {
-            source.sendError(Text.literal("§cFaction '" + factionName + "' not found or has no members"));
-            return 0;
-        }
-        
         int count = 0;
-        String mode = escort ? "escorting" : "following";
-        for (String member : members) {
-            if (BotManager.getAllBots().contains(member)) {
-                BotMovement.setFollow(member, targetName, escort);
-                count++;
-            }
-        }
-        
-        if (count > 0) {
-            int finalCount = count;
-            source.sendFeedback(() -> Text.literal("§a" + finalCount + " bots in faction '" + factionName + "' are now " + mode + " '" + targetName + "'"), true);
-            return count;
-        } else {
-            source.sendError(Text.literal("§cNo bots found in faction '" + factionName + "'"));
-            return 0;
-        }
-    }
-    
-    private static int factionGoto(ServerCommandSource source, String factionName, double x, double y, double z) {
-        var members = BotFaction.getMembers(factionName);
-        if (members.isEmpty()) {
-            source.sendError(Text.literal("§cFaction '" + factionName + "' not found or has no members"));
-            return 0;
-        }
-        
-        int count = 0;
-        Vec3d targetPos = new Vec3d(x, y, z);
-        for (String member : members) {
-            if (BotManager.getAllBots().contains(member)) {
-                BotMovement.setGoto(member, targetPos);
-                count++;
-            }
-        }
-        
-        if (count > 0) {
-            int finalCount = count;
-            source.sendFeedback(() -> Text.literal("§a" + finalCount + " bots in faction '" + factionName + "' are moving to " + 
-                String.format("%.1f %.1f %.1f", x, y, z)), true);
-            return count;
-        } else {
-            source.sendError(Text.literal("§cNo bots found in faction '" + factionName + "'"));
-            return 0;
-        }
-    }
-    
-    
-    private static int showApiDebugInfo(ServerCommandSource source) {
-        try {
-            String debugInfo = PvpBotAPI.getDebugInfo();
-            String[] lines = debugInfo.split("\n");
-            
-            source.sendFeedback(() -> Text.literal("=== PVP Bot API Debug Info ==="), false);
-            for (String line : lines) {
-                if (!line.trim().isEmpty()) {
-                    source.sendFeedback(() -> Text.literal(line), false);
+        for (String memberName : members) {
+            if (BotManager.getAllBots().contains(memberName)) {
+                var bot = BotManager.getBot(source.getServer(), memberName);
+                if (bot != null && BotKits.giveKit(kitname, bot)) {
+                    count++;
                 }
             }
-            
-
-            var eventManager = PvpBotAPI.getEventManager();
-            var strategyRegistry = PvpBotAPI.getCombatStrategyRegistry();
-            
-            source.sendFeedback(() -> Text.literal(""), false);
-            source.sendFeedback(() -> Text.literal("=== Detailed Event Handler Info ==="), false);
-            source.sendFeedback(() -> Text.literal("Spawn handlers: " + eventManager.getSpawnHandlerCount()), false);
-            source.sendFeedback(() -> Text.literal("Death handlers: " + eventManager.getDeathHandlerCount()), false);
-            source.sendFeedback(() -> Text.literal("Attack handlers: " + eventManager.getAttackHandlerCount()), false);
-            source.sendFeedback(() -> Text.literal("Damage handlers: " + eventManager.getDamageHandlerCount()), false);
-            source.sendFeedback(() -> Text.literal("Tick handlers: " + eventManager.getTickHandlerCount()), false);
-            
-            source.sendFeedback(() -> Text.literal(""), false);
-            source.sendFeedback(() -> Text.literal("=== Combat Strategy Details ==="), false);
-            String strategyDebugInfo = strategyRegistry.getDebugInfo();
-            String[] strategyLines = strategyDebugInfo.split("\n");
-            for (String line : strategyLines) {
-                if (!line.trim().isEmpty()) {
-                    source.sendFeedback(() -> Text.literal(line), false);
-                }
-            }
-            
-            source.sendFeedback(() -> Text.literal(""), false);
-            source.sendFeedback(() -> Text.literal("API Status: " + (PvpBotAPI.isInitialized() ? "Initialized" : "Not Initialized")), false);
-            
-            return 1;
-        } catch (Exception e) {
-            source.sendError(Text.literal("Failed to get API debug info: " + e.getMessage()));
-            e.printStackTrace();
-            return 0;
         }
+        int finalCount = count;
+        source.sendFeedback(() -> Text.literal("Gave kit '" + kitname + "' to " + finalCount + " bots in faction '" + faction + "'"), true);
+        return 1;
     }
 }

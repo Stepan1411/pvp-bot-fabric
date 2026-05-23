@@ -1,0 +1,25 @@
+v14 -> v15 Changelog
+
+- Removed SGUI
+- Removed Admiral (migrated to Brigadier)
+- Removed API module (BotEventManager, CombatStrategyRegistry, BotAPIIntegration, PvpBotAPI)
+- Removed stats, debug, sync, pathfinding
+- Removed ExampleEventHandlers (noisy logs)
+- Removed BotElytraMace (elytra-mace + all sub-settings)
+- Removed bhop-cooldown, jump-boost, reaction-delay, min-armor-level, shield-main-hand, prefer-shield-mace
+- Restructured to bot-management and kit groups
+- Moved massspawn -> bot-management mass-spawn
+- Changed stop attack -> stop-attack
+- Renamed all settings to kebab-case (auto-armor, attack-cooldown, etc.)
+- Added tab completion for bot/kit names
+- Added tab completion for player names (give-kit, faction add/remove/attack)
+- Added /pvpbot reload
+- Added botLeaveOnDeath (auto-runs /herobot botLeaveOnDeath)
+- Added attackInvincible (prevents attacking creative/spectator/invulnerable)
+- Added aim-speed setting (bot rotation speed, 3-45)
+- Removed noisy startup/background logs
+- Fixed bot restore (player spawn -> playerspawn)
+- Improved movement (smooth look, strafe, W-tap, knockback detection, bhop)
+- Improved shield AI (enemy attack prediction, random flicker, hold-over)
+- Added shield-break-chance setting (axe break with delay + chance)
+- Fixed bot was not deleted from bots.json after death

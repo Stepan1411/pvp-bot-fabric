@@ -44,6 +44,12 @@ public class BotKits {
         load();
     }
     
+    public static void reload(MinecraftServer srv) {
+        currentServer = srv;
+        configPath = org.stepan1411.pvp_bot.config.WorldConfigHelper.getGlobalConfigDir().resolve("kits.json");
+        load();
+    }
+    
     
     public static boolean createKit(String kitName, ServerPlayerEntity player) {
         String key = kitName.toLowerCase();
