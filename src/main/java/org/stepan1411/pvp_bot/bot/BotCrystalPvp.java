@@ -51,6 +51,9 @@ public class BotCrystalPvp {
     
     
     public static boolean doCrystalPvp(ServerPlayerEntity bot, Entity target, BotSettings settings, net.minecraft.server.MinecraftServer server) {
+        if (BotUtils.getState(bot.getName().getString()).isEating) {
+            return false;
+        }
         CrystalState state = getState(bot.getName().getString());
         World world = bot.getEntityWorld();
         double distance = bot.distanceTo(target);

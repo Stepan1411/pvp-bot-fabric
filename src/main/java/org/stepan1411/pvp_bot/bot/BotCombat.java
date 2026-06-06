@@ -738,9 +738,13 @@ public class BotCombat {
     private static void handleMeleeCombat(ServerPlayerEntity bot, Entity target, CombatState state, double distance, BotSettings settings, net.minecraft.server.MinecraftServer server) {
         var utilsState = BotUtils.getState(bot.getName().getString());
         
-
+ 
+        if (state.isUsingShield && !bot.isBlocking()) {
+            state.isUsingShield = false;
+        }
+        
         if (state.isMaceDefending && state.maceDefenseCooldown > 0) {
-
+ 
             lookAtTarget(bot, target);
             return;
         }
@@ -812,7 +816,7 @@ public class BotCombat {
             holdShield = true;
         } else if (!willAttack && lowHealth) {
             holdShield = true;
-        } else if (!willAttack && random.nextFloat() < 0.02f) {
+        } else if (!willAttack && healthPercent < 0.8f && random.nextFloat() < 0.004f && state.shieldToggleCooldown <= 0) {
             holdShield = true;
             state.shieldFlickerTicks = 3 + random.nextInt(3);
         }
@@ -854,7 +858,7 @@ public class BotCombat {
         }
 
         if (distance <= meleeRange && state.attackCooldown <= 0) {
-            if (state.shieldPredictTicks > 0 || state.shieldHoldTicks > 0 || utilsState.blockHoldTicks > 0) {
+            if (bot.isBlocking() && (state.shieldPredictTicks > 0 || state.shieldHoldTicks > 0 || utilsState.blockHoldTicks > 0)) {
                 return;
             }
 

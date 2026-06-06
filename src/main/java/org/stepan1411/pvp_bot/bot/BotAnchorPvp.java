@@ -58,6 +58,9 @@ public class BotAnchorPvp {
     
     
     public static boolean doAnchorPvp(ServerPlayerEntity bot, Entity target, BotSettings settings, net.minecraft.server.MinecraftServer server) {
+        if (BotUtils.getState(bot.getName().getString()).isEating) {
+            return false;
+        }
         AnchorState state = getState(bot.getName().getString());
         World world = bot.getEntityWorld();
         double distance = bot.distanceTo(target);

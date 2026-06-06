@@ -414,14 +414,26 @@ public class BotUtils {
         boolean shouldEatGoldenApple = needHealth && hasGoldenApple(bot.getInventory());
         
         if ((shouldEat || shouldEatGoldenApple) && state.eatCooldown <= 0 && !state.isBlocking) {
+ 
+            if (combatState.isUsingShield) {
+                try {
+                    server.getCommandManager().getDispatcher().execute(
+                        "player " + bot.getName().getString() + " stop",
+                        server.getCommandSource()
+                    );
+                } catch (Exception e) {}
+                combatState.isUsingShield = false;
+                combatState.shieldToggleCooldown = 20;
+            }
+ 
             int foodSlot = findBestFood(bot.getInventory(), needHealth || criticalHealth);
             if (foodSlot >= 0) {
                 var inventory = bot.getInventory();
                 
-
+ 
                 ItemStack foodStack = inventory.getStack(foodSlot);
                 if (!foodStack.isEmpty() && foodStack.getItem().getComponents().get(DataComponentTypes.FOOD) != null) {
-
+ 
                     if (foodSlot >= 9) {
                         ItemStack food = inventory.getStack(foodSlot);
                         ItemStack current = inventory.getStack(8);
@@ -432,10 +444,10 @@ public class BotUtils {
                     
                     state.eatingSlot = foodSlot;
                     
-
+ 
                     org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, foodSlot);
                     
-
+ 
                     executeCommand(server, bot, "player " + bot.getName().getString() + " use continuous");
                     state.isEating = true;
                     state.eatingTicks = 0;
