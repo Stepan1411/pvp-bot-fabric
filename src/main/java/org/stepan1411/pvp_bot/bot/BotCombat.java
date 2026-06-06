@@ -76,6 +76,36 @@ public class BotCombat {
         }
     }
     
+    // ========== ELYTRA MACE TEST ==========
+
+    public static class ElytraMaceState {
+        public String targetName;
+        public int phase = 0;
+        public int tickCounter = 0;
+        public int totalTicks = 0;
+        public double phaseStartY = 0;
+        public ItemStack savedElytra = ItemStack.EMPTY;
+    }
+
+    private static final Map<String, ElytraMaceState> elytraMaceStates = new HashMap<>();
+    private static final Map<String, ItemStack> pendingElytraRestore = new HashMap<>();
+
+    public static boolean isElytraMaceActive(String botName) {
+        return elytraMaceStates.containsKey(botName);
+    }
+
+    public static void startElytraMace(String botName, String targetName) {
+        ElytraMaceState state = new ElytraMaceState();
+        state.targetName = targetName;
+        state.phase = 0;
+        state.tickCounter = 0;
+        elytraMaceStates.put(botName, state);
+    }
+
+    public static void stopElytraMace(String botName) {
+        elytraMaceStates.remove(botName);
+    }
+
     public static CombatState getState(String botName) {
         return combatStates.computeIfAbsent(botName, k -> new CombatState());
     }
@@ -86,6 +116,59 @@ public class BotCombat {
     
     
     public static void update(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server) {
+        String botName = bot.getName().getString();
+
+        if (pendingElytraRestore.containsKey(botName)) {
+            if (bot.isOnGround() || bot.getHealth() <= 0) {
+                ItemStack elytra = pendingElytraRestore.remove(botName);
+                if (!elytra.isEmpty()) {
+                    var inv = bot.getInventory();
+                    boolean placed = false;
+                    for (int i = 0; i < 41; i++) {
+                        if (inv.getStack(i).isEmpty()) {
+                            inv.setStack(i, elytra.copy());
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if (!placed) {
+                        bot.dropItem(elytra.copy(), true, true);
+                    }
+                }
+                if (bot.isAlive()) {
+                    CombatState st = getState(botName);
+                    if (st.forcedTargetName != null) {
+                        Entity t = server.getPlayerManager().getPlayer(st.forcedTargetName);
+                        if (t != null && t.isAlive() && hasElytraMaceItems(bot)) {
+                            startElytraMace(botName, st.forcedTargetName);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!elytraMaceStates.containsKey(botName) && !pendingElytraRestore.containsKey(botName)) {
+            CombatState st = getState(botName);
+            String targetName = null;
+            if (st.lastAttacker instanceof PlayerEntity && st.lastAttacker.isAlive() && System.currentTimeMillis() - st.lastAttackTime < 2000) {
+                targetName = st.lastAttacker.getName().getString();
+            } else if (st.forcedTargetName != null) {
+                Entity forced = server.getPlayerManager().getPlayer(st.forcedTargetName);
+                if (forced != null && forced.isAlive()) {
+                    targetName = st.forcedTargetName;
+                }
+            }
+            if (targetName != null && hasElytraMaceItems(bot)) {
+                startElytraMace(botName, targetName);
+            }
+        }
+
+        // Handle Elytra Mace Test before normal combat
+        if (elytraMaceStates.containsKey(botName)) {
+            handleElytraMace(bot, server);
+            return;
+        }
+
         BotSettings settings = BotSettings.get();
         if (!settings.isCombatEnabled()) return;
         
@@ -215,21 +298,27 @@ public class BotCombat {
             if (settings.isAutoShieldEnabled()) {
                 var inventory = bot.getInventory();
 
-                ItemStack offhandItem = bot.getOffHandStack();
-                if (offhandItem.isEmpty() || !offhandItem.getItem().toString().contains("shield")) {
-                    int shieldSlot = findShield(inventory);
-                    if (shieldSlot >= 0) {
-
-                        ItemStack shield = inventory.getStack(shieldSlot);
-                        inventory.setStack(40, shield);
-                        inventory.setStack(shieldSlot, ItemStack.EMPTY);
+                if (!utilsState.isEating && !utilsState.isBlocking) {
+                    if (org.stepan1411.pvp_bot.bot.BotUtils.shouldUseMainHandShield(bot)) {
+                        org.stepan1411.pvp_bot.bot.BotUtils.equipShieldToMainHand(bot);
+                    } else {
+                        ItemStack offhandItem = bot.getOffHandStack();
+                        if (offhandItem.isEmpty() || !offhandItem.getItem().toString().contains("shield")) {
+                            int shieldSlot = findShield(inventory);
+                            if (shieldSlot >= 0) {
+                                ItemStack shield = inventory.getStack(shieldSlot);
+                                inventory.setStack(40, shield);
+                                inventory.setStack(shieldSlot, ItemStack.EMPTY);
+                            }
+                        }
                     }
                 }
-                
 
                 if (!state.isUsingShield && state.shieldToggleCooldown <= 0) {
-                    startUsingShield(bot, server);
-                    state.isUsingShield = true;
+                    if (!utilsState.isEating && !utilsState.isBlocking) {
+                        startUsingShield(bot, server);
+                        state.isUsingShield = true;
+                    }
                 }
             }
             
@@ -604,6 +693,9 @@ public class BotCombat {
                 } catch (Exception e) {
                     bot.clearActiveItem();
                 }
+                if (org.stepan1411.pvp_bot.bot.BotUtils.shouldUseMainHandShield(bot)) {
+                    org.stepan1411.pvp_bot.bot.BotUtils.unequipShieldFromMainHand(bot);
+                }
                 combatState.isUsingShield = false;
                 combatState.isMaceDefending = false;
             }
@@ -611,19 +703,23 @@ public class BotCombat {
         }
         
 
-        int shieldSlot = findShield(inventory);
-        if (shieldSlot < 0) {
-            return;
-        }
-        
+        if (!utilsState.isEating) {
+            if (org.stepan1411.pvp_bot.bot.BotUtils.shouldUseMainHandShield(bot)) {
+                org.stepan1411.pvp_bot.bot.BotUtils.equipShieldToMainHand(bot);
+            } else {
+                int shieldSlot = findShield(inventory);
+                if (shieldSlot < 0) {
+                    return;
+                }
 
-        if (shieldSlot != 40) {
-            ItemStack shield = inventory.getStack(shieldSlot);
-            ItemStack current = inventory.getStack(40);
-            inventory.setStack(shieldSlot, current);
-            inventory.setStack(40, shield);
+                if (shieldSlot != 40) {
+                    ItemStack shield = inventory.getStack(shieldSlot);
+                    ItemStack current = inventory.getStack(40);
+                    inventory.setStack(shieldSlot, current);
+                    inventory.setStack(40, shield);
+                }
+            }
         }
-        
 
         if (!combatState.isUsingShield) {
             try {
@@ -696,8 +792,8 @@ public class BotCombat {
 
             // Enemy sprinting toward + in range + distance decreasing = about to attack
             if (inMelee && enemySprinting && enemyClosing && state.enemyCooldown <= 0) {
-                state.shieldPredictTicks = 10 + random.nextInt(8);
-                state.shieldHoldTicks = 6;
+                state.shieldPredictTicks = settings.getShieldRaiseTicks();
+                state.shieldHoldTicks = Math.max(6, settings.getShieldRaiseTicks() / 2);
                 state.enemyCooldown = 15 + random.nextInt(10);
             }
         }
@@ -709,41 +805,58 @@ public class BotCombat {
         boolean lowHealth = healthPercent < settings.getShieldHealthThreshold();
         boolean willAttack = distance <= meleeRange && state.attackCooldown == 1;
 
-        // Decide to hold shield
+        // Combat shield management (predicts attacks, equips shield)
+        boolean isEating = utilsState.isEating;
         boolean holdShield = false;
         if (state.shieldPredictTicks > 0 || state.shieldHoldTicks > 0) {
             holdShield = true;
-        } else if (!willAttack && lowHealth && settings.isAutoShieldEnabled()) {
+        } else if (!willAttack && lowHealth) {
             holdShield = true;
-        } else if (inventory.getStack(40).getItem() == Items.SHIELD && !willAttack && random.nextFloat() < 0.02f) {
-            holdShield = true; // 2% random flicker per tick
+        } else if (!willAttack && random.nextFloat() < 0.02f) {
+            holdShield = true;
             state.shieldFlickerTicks = 3 + random.nextInt(3);
         }
         if (state.shieldFlickerTicks > 0) holdShield = true;
 
-        // Equip shield to offhand
+        // Equip shield: main hand (slot 1) when totemPriority, else offhand
         boolean hasShieldInOffhand = bot.getOffHandStack().getItem() == Items.SHIELD;
-        if (holdShield && !hasShieldInOffhand) {
-            int shieldSlot = findShield(inventory);
-            if (shieldSlot >= 0) {
-                ItemStack shield = inventory.getStack(shieldSlot);
-                inventory.setStack(40, shield);
-                inventory.setStack(shieldSlot, ItemStack.EMPTY);
+        if (holdShield && !hasShieldInOffhand && !isEating) {
+            if (org.stepan1411.pvp_bot.bot.BotUtils.shouldUseMainHandShield(bot)) {
+                org.stepan1411.pvp_bot.bot.BotUtils.equipShieldToMainHand(bot);
+            } else {
+                int shieldSlot = findShield(inventory);
+                if (shieldSlot >= 0) {
+                    ItemStack shield = inventory.getStack(shieldSlot);
+                    inventory.setStack(40, shield);
+                    inventory.setStack(shieldSlot, ItemStack.EMPTY);
+                }
             }
         }
 
-        // Toggle shield
-        if (holdShield && !state.isUsingShield && state.shieldToggleCooldown <= 0) {
-            startUsingShield(bot, server);
-            state.isUsingShield = true;
-        } else if (!holdShield && state.isUsingShield && state.shieldToggleCooldown <= 0) {
-            stopUsingShield(bot, server);
-            state.isUsingShield = false;
-            state.shieldToggleCooldown = 5;
+        // Toggle shield (only when autoShield is NOT active to avoid double-toggling)
+        boolean autoShieldActive = settings.isAutoShieldEnabled() && utilsState.isBlocking;
+        if (!autoShieldActive) {
+            if (holdShield && !state.isUsingShield && state.shieldToggleCooldown <= 0) {
+                if (!isEating) {
+                    startUsingShield(bot, server);
+                    state.isUsingShield = true;
+                }
+            } else if (!holdShield && state.isUsingShield && state.shieldToggleCooldown <= 0) {
+                stopUsingShield(bot, server);
+                state.isUsingShield = false;
+                state.shieldToggleCooldown = 5;
+            }
+        }
+
+        // Restore main hand when not holding shield and totemPriority
+        if (!holdShield && org.stepan1411.pvp_bot.bot.BotUtils.shouldUseMainHandShield(bot) && !isEating && !autoShieldActive) {
+            org.stepan1411.pvp_bot.bot.BotUtils.unequipShieldFromMainHand(bot);
         }
 
         if (distance <= meleeRange && state.attackCooldown <= 0) {
-            
+            if (state.shieldPredictTicks > 0 || state.shieldHoldTicks > 0 || utilsState.blockHoldTicks > 0) {
+                return;
+            }
 
             if (bot.getAttackCooldownProgress(0.5f) < 1.0f) {
                 return;
@@ -975,7 +1088,7 @@ public class BotCombat {
             if (verticalSpeed < 0 && distance <= 5.0 && state.attackCooldown <= 0) {
 
                 attackWithCarpet(bot, target, server);
-                state.attackCooldown = 5;
+                state.attackCooldown = 1;
             }
             return;
         }
@@ -1545,6 +1658,8 @@ public class BotCombat {
         state.lastAttacker = null;
         state.lastAttackTime = 0;
         state.isRetreating = false;
+        elytraMaceStates.remove(botName);
+        pendingElytraRestore.remove(botName);
     }
     
     
@@ -1562,10 +1677,272 @@ public class BotCombat {
         CombatState state = getState(bot.getName().getString());
         state.lastAttacker = attacker;
         state.lastAttackTime = System.currentTimeMillis();
+
+        String botName = bot.getName().getString();
+        if (!elytraMaceStates.containsKey(botName) && !pendingElytraRestore.containsKey(botName)) {
+            if (attacker instanceof PlayerEntity && attacker.isAlive() && hasElytraMaceItems(bot)) {
+                startElytraMace(botName, attacker.getName().getString());
+            }
+        }
     }
     
     
     public static Entity getTarget(String botName) {
         return getState(botName).target;
+    }
+
+    // ========== ELYTRA MACE HANDLER ==========
+
+    private static boolean hasElytraMaceItems(ServerPlayerEntity bot) {
+        var inv = bot.getInventory();
+        boolean hasElytra = false;
+        boolean hasFireworks = false;
+        boolean hasMace = false;
+        for (int i = 0; i < 41; i++) {
+            Item item = inv.getStack(i).getItem();
+            if (item == Items.ELYTRA) hasElytra = true;
+            if (item == Items.FIREWORK_ROCKET) hasFireworks = true;
+            if (item == Items.MACE) hasMace = true;
+        }
+        return hasElytra && hasFireworks && hasMace;
+    }
+
+    private static void handleElytraMace(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server) {
+        String botName = bot.getName().getString();
+        ElytraMaceState state = elytraMaceStates.get(botName);
+        if (state == null) return;
+
+        var inventory = bot.getInventory();
+        state.tickCounter++;
+        state.totalTicks++;
+
+        if (state.totalTicks > 300) {
+            elytraMaceStates.remove(botName);
+            return;
+        }
+
+        if (state.phase < 6) {
+            boolean hasFireworks = false;
+            for (int i = 0; i < 41; i++) {
+                if (inventory.getStack(i).getItem() == Items.FIREWORK_ROCKET) {
+                    hasFireworks = true;
+                    break;
+                }
+            }
+            if (!hasFireworks) {
+                elytraMaceStates.remove(botName);
+                return;
+            }
+        }
+
+        Entity currentTarget = server.getPlayerManager().getPlayer(state.targetName);
+        if (currentTarget == null || !currentTarget.isAlive()) {
+            elytraMaceStates.remove(botName);
+            return;
+        }
+
+        switch (state.phase) {
+            case 0: {
+                try {
+                    server.getCommandManager().getDispatcher().execute(
+                        "player " + botName + " stop",
+                        server.getCommandSource()
+                    );
+                } catch (Exception ignored) {}
+                for (int i = 0; i < 41; i++) {
+                    if (inventory.getStack(i).getItem() == Items.ELYTRA) {
+                        if (i != 38) {
+                            ItemStack elytra = inventory.getStack(i);
+                            ItemStack current38 = inventory.getStack(38);
+                            inventory.setStack(i, current38);
+                            inventory.setStack(38, elytra);
+                        }
+                        break;
+                    }
+                }
+                state.phase = 1;
+                state.tickCounter = 0;
+                break;
+            }
+            case 1: {
+                for (int i = 0; i < 41; i++) {
+                    if (inventory.getStack(i).getItem() == Items.FIREWORK_ROCKET) {
+                        if (i != 0) {
+                            ItemStack rocket = inventory.getStack(i);
+                            ItemStack current = inventory.getStack(0);
+                            inventory.setStack(i, current);
+                            inventory.setStack(0, rocket);
+                        }
+                        org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
+                        break;
+                    }
+                }
+                state.phase = 2;
+                state.tickCounter = 0;
+                break;
+            }
+            case 2: {
+                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
+                bot.setPitch(-90);
+                try {
+                    server.getCommandManager().getDispatcher().execute(
+                        "player " + botName + " jump once",
+                        server.getCommandSource()
+                    );
+                } catch (Exception ignored) {}
+                state.phaseStartY = bot.getY();
+                state.phase = 3;
+                state.tickCounter = 0;
+                break;
+            }
+            case 3: {
+                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
+                if (state.tickCounter == 5) {
+                    if (bot.getY() - state.phaseStartY < 0.3) {
+                        elytraMaceStates.remove(botName);
+                        return;
+                    }
+                }
+                if (state.tickCounter >= 6) {
+                    state.phase = 4;
+                    state.tickCounter = 0;
+                }
+                break;
+            }
+            case 4: {
+                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
+                try {
+                    server.getCommandManager().getDispatcher().execute(
+                        "player " + botName + " jump once",
+                        server.getCommandSource()
+                    );
+                } catch (Exception ignored) {}
+                state.phase = 5;
+                state.tickCounter = 0;
+                break;
+            }
+            case 5: {
+                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
+                if (state.tickCounter >= 1) {
+                    try {
+                        server.getCommandManager().getDispatcher().execute(
+                            "player " + botName + " use once",
+                            server.getCommandSource()
+                        );
+                    } catch (Exception ignored) {}
+                    state.phase = 6;
+                    state.tickCounter = 0;
+                }
+                break;
+            }
+            case 6: {
+                if (state.tickCounter >= 10) {
+                    state.phase = 7;
+                    state.tickCounter = 0;
+                }
+                break;
+            }
+            case 7: {
+                state.savedElytra = inventory.getStack(38).copy();
+                if (inventory.getStack(38).getItem() == Items.ELYTRA) {
+                    inventory.setStack(38, ItemStack.EMPTY);
+                }
+                for (int i = 0; i < 41; i++) {
+                    ItemStack stack = inventory.getStack(i);
+                    if (stack.isEmpty()) continue;
+                    Item item = stack.getItem();
+                    boolean isChestplate = item == Items.NETHERITE_CHESTPLATE ||
+                        item == Items.DIAMOND_CHESTPLATE ||
+                        item == Items.IRON_CHESTPLATE ||
+                        item == Items.CHAINMAIL_CHESTPLATE ||
+                        item == Items.GOLDEN_CHESTPLATE ||
+                        item == Items.LEATHER_CHESTPLATE;
+                    if (isChestplate) {
+                        inventory.setStack(38, stack.copy());
+                        inventory.setStack(i, ItemStack.EMPTY);
+                        break;
+                    }
+                }
+                state.phase = 8;
+                state.tickCounter = 0;
+                break;
+            }
+            case 8: {
+                if (state.tickCounter >= 1) {
+                    state.phase = 9;
+                    state.tickCounter = 0;
+                }
+                break;
+            }
+            case 9: {
+                if (!state.savedElytra.isEmpty()) {
+                    ItemStack current38 = inventory.getStack(38);
+                    boolean isChestplate = current38.getItem() == Items.NETHERITE_CHESTPLATE ||
+                        current38.getItem() == Items.DIAMOND_CHESTPLATE ||
+                        current38.getItem() == Items.IRON_CHESTPLATE ||
+                        current38.getItem() == Items.CHAINMAIL_CHESTPLATE ||
+                        current38.getItem() == Items.GOLDEN_CHESTPLATE ||
+                        current38.getItem() == Items.LEATHER_CHESTPLATE;
+                    if (isChestplate) {
+                        boolean placed = false;
+                        for (int i = 0; i < 38; i++) {
+                            if (inventory.getStack(i).isEmpty()) {
+                                inventory.setStack(i, current38.copy());
+                                placed = true;
+                                break;
+                            }
+                        }
+                        if (!placed) {
+                            bot.dropItem(current38.copy(), true, true);
+                        }
+                    }
+                    inventory.setStack(38, state.savedElytra.copy());
+                }
+                state.phase = 10;
+                state.tickCounter = 0;
+                break;
+            }
+            case 10: {
+                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
+                if (state.tickCounter >= 2) {
+                    try {
+                        server.getCommandManager().getDispatcher().execute(
+                            "player " + botName + " jump once",
+                            server.getCommandSource()
+                        );
+                    } catch (Exception ignored) {}
+                    state.phase = 11;
+                    state.tickCounter = 0;
+                }
+                break;
+            }
+            case 11: {
+                Entity targetEntity = server.getPlayerManager().getPlayer(state.targetName);
+                if (targetEntity != null && targetEntity.isAlive()) {
+                    lookAtTarget(bot, targetEntity);
+                    BotNavigation.moveToward(bot, targetEntity, 1.0);
+                    double dist = bot.distanceTo(targetEntity);
+                    if (dist <= 8.0) {
+                        ItemStack chestSlot = inventory.getStack(38);
+                        if (chestSlot.getItem() == Items.ELYTRA) {
+                            inventory.setStack(38, ItemStack.EMPTY);
+                            pendingElytraRestore.put(botName, chestSlot.copy());
+                        }
+                        int maceSlot = findMace(inventory);
+                        if (maceSlot >= 0 && maceSlot < 9) {
+                            org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, maceSlot);
+                        }
+                        lookAtTarget(bot, targetEntity);
+                        attackWithCarpet(bot, targetEntity, server);
+                        CombatState combatState = getState(botName);
+                        combatState.forcedTargetName = state.targetName;
+                        elytraMaceStates.remove(botName);
+                    }
+                } else {
+                    elytraMaceStates.remove(botName);
+                }
+                break;
+            }
+        }
     }
 }

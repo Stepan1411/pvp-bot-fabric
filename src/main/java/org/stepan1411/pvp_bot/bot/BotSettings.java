@@ -52,6 +52,8 @@ public class BotSettings {
     private double mendDurabilityThreshold = 0.25;
     private double shieldHealthThreshold = 0.5;
     private boolean shieldBreakEnabled = true;
+    private int shieldHoldTicks = 60;
+    private int shieldRaiseTicks = 12;
     private boolean preferSword = true;
     private int minHungerToEat = 14;
     private boolean autoPotionEnabled = true;
@@ -71,7 +73,7 @@ public class BotSettings {
     private boolean useSpecialNames = false;
     private boolean botLeaveOnDeath = true;
     private boolean attackInvincible = false;
-    private double aimSpeed = 15.0;
+    private double aimSpeed = 60.0;
     private boolean shieldMace = true;
     
     private BotSettings() {}
@@ -177,6 +179,8 @@ public class BotSettings {
     public int getMissChance() { return missChance; }
     public int getMistakeChance() { return mistakeChance; }
     public int getShieldBreakChance() { return shieldBreakChance; }
+    public int getShieldHoldTicks() { return shieldHoldTicks; }
+    public int getShieldRaiseTicks() { return shieldRaiseTicks; }
     public boolean isBotsRelogs() { return botsRelogs; }
     
 
@@ -320,12 +324,20 @@ public class BotSettings {
         this.shieldBreakChance = Math.max(0, Math.min(100, value)); 
         save(); 
     }
+    public void setShieldHoldTicks(int value) { 
+        this.shieldHoldTicks = Math.max(10, Math.min(200, value)); 
+        save(); 
+    }
+    public void setShieldRaiseTicks(int value) { 
+        this.shieldRaiseTicks = Math.max(2, Math.min(40, value)); 
+        save(); 
+    }
     public void setBotsRelogs(boolean value) { this.botsRelogs = value; save(); }
     public void setUseSpecialNames(boolean value) { this.useSpecialNames = value; save(); }
     public void setBotLeaveOnDeath(boolean value) { this.botLeaveOnDeath = value; save(); }
     public void setAttackInvincible(boolean value) { this.attackInvincible = value; save(); }
     public void setAimSpeed(double value) { 
-        this.aimSpeed = Math.max(3.0, Math.min(45.0, value)); 
+        this.aimSpeed = Math.max(3.0, Math.min(90.0, value)); 
         save(); 
     }
     

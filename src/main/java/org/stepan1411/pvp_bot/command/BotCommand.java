@@ -226,6 +226,7 @@ public class BotCommand {
                         .then(CommandManager.argument("kitname", StringArgumentType.word())
                             .suggests(KIT_SUGGESTIONS)
                             .executes(BotCommand::factionGiveKit)))))
+
         );
     }
 
@@ -268,6 +269,8 @@ public class BotCommand {
         settings.then(intSetting("miss-chance", () -> BotSettings.get().getMissChance(), v -> BotSettings.get().setMissChance(v), 0, 100));
         settings.then(intSetting("mistake-chance", () -> BotSettings.get().getMistakeChance(), v -> BotSettings.get().setMistakeChance(v), 0, 100));
         settings.then(intSetting("shield-break-chance", () -> BotSettings.get().getShieldBreakChance(), v -> BotSettings.get().setShieldBreakChance(v), 0, 100));
+        settings.then(intSetting("shield-hold-ticks", () -> BotSettings.get().getShieldHoldTicks(), v -> BotSettings.get().setShieldHoldTicks(v), 10, 200));
+        settings.then(intSetting("shield-raise-ticks", () -> BotSettings.get().getShieldRaiseTicks(), v -> BotSettings.get().setShieldRaiseTicks(v), 2, 40));
         settings.then(boolSetting("retreat", () -> BotSettings.get().isRetreatEnabled(), v -> BotSettings.get().setRetreatEnabled(v)));
         settings.then(boolSetting("auto-eat", () -> BotSettings.get().isAutoEatEnabled(), v -> BotSettings.get().setAutoEatEnabled(v)));
         settings.then(boolSetting("auto-mend", () -> BotSettings.get().isAutoMendEnabled(), v -> BotSettings.get().setAutoMendEnabled(v)));
@@ -1198,4 +1201,5 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("Gave kit '" + kitname + "' to " + finalCount + " bots in faction '" + faction + "'"), true);
         return 1;
     }
+
 }

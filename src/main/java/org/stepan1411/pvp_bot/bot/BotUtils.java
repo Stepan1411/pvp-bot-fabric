@@ -34,6 +34,8 @@ public class BotUtils {
         public int xpBottlesNeeded = 0;
         public java.util.List<Integer> potionsToThrow = new java.util.ArrayList<>();
         public ItemStack savedOffhandItem = ItemStack.EMPTY;
+        public int savedMainHandSlot = -1;
+        public int blockHoldTicks = 0;
         
         public boolean isInCobweb = false;
         public boolean isEscapingCobweb = false;
@@ -122,8 +124,18 @@ public class BotUtils {
         }
         
 
-        if (settings.isAutoEatEnabled() && (state.isEating || !state.isBlocking)) {
-            handleAutoEat(bot, state, settings, server);
+        if (settings.isAutoEatEnabled()) {
+            boolean criticalHunger = bot.getHungerManager().getFoodLevel() <= 6;
+            if (state.isEating || !state.isBlocking || criticalHunger) {
+                if (state.isBlocking && criticalHunger) {
+                    if (shouldUseMainHandShield(bot)) {
+                        stopMainHandBlocking(bot, state, server);
+                    } else {
+                        stopBlocking(bot, state, server);
+                    }
+                }
+                handleAutoEat(bot, state, settings, server);
+            }
         }
         
         handleCobwebEscape(bot, state, server);
@@ -495,65 +507,72 @@ public class BotUtils {
         }
         
 
-        if (settings.isTotemPriority()) {
-            ItemStack offhand = inventory.getStack(40);
-            if (offhand.getItem() == Items.TOTEM_OF_UNDYING) {
-
-                if (state.isBlocking) {
-                    stopBlocking(bot, state, server);
-                }
-                return;
-            }
-        }
-        
         var combatState = BotCombat.getState(bot.getName().getString());
-        
 
         if (combatState.isMaceDefending) {
             return;
         }
-        
+
         var target = combatState.target;
-        
-        if (target == null || state.shieldCooldown > 0) {
+
+        if (target == null) {
             if (state.isBlocking) {
-                stopBlocking(bot, state, server);
+                if (shouldUseMainHandShield(bot)) {
+                    stopMainHandBlocking(bot, state, server);
+                } else {
+                    stopBlocking(bot, state, server);
+                }
             }
             return;
         }
-        
+
+        if (state.shieldCooldown > 0 && !state.isBlocking) {
+            return;
+        }
+
         double distance = bot.distanceTo(target);
         boolean isRetreating = combatState.isRetreating;
         float health = bot.getHealth();
         float maxHealth = bot.getMaxHealth();
         boolean lowHealth = health <= maxHealth * 0.3f;
-        
-
-
 
         boolean shouldBlock = false;
-        
-        if (distance <= 4.0) {
 
+        if (distance <= 4.0) {
             if (target instanceof PlayerEntity player && player.handSwinging) {
                 shouldBlock = true;
             }
-
             if (isRetreating && lowHealth) {
                 shouldBlock = true;
             }
         }
-        
 
         if (state.isEating) {
             shouldBlock = false;
         }
-        
+
         if (shouldBlock && !state.isBlocking) {
-            startBlocking(bot, state, shieldSlot, server);
+            if (shouldUseMainHandShield(bot)) {
+                startMainHandBlocking(bot, state, server);
+            } else {
+                startBlocking(bot, state, shieldSlot, server);
+            }
+            state.blockHoldTicks = settings.getShieldHoldTicks();
             state.shieldCooldown = 30;
-        } else if (!shouldBlock && state.isBlocking) {
-            stopBlocking(bot, state, server);
+        }
+
+        if (shouldBlock) {
+            state.blockHoldTicks = settings.getShieldHoldTicks();
+        } else if (state.isBlocking) {
+            state.blockHoldTicks--;
+        }
+
+        if (!shouldBlock && state.isBlocking && state.blockHoldTicks <= 0) {
+            if (shouldUseMainHandShield(bot)) {
+                stopMainHandBlocking(bot, state, server);
+            } else {
+                stopBlocking(bot, state, server);
+            }
         }
     }
     
@@ -614,8 +633,58 @@ public class BotUtils {
         }
         return -1;
     }
-    
-    
+
+    public static boolean shouldUseMainHandShield(ServerPlayerEntity bot) {
+        if (!BotSettings.get().isTotemPriority()) return false;
+        return bot.getInventory().getStack(40).getItem() == Items.TOTEM_OF_UNDYING;
+    }
+
+    private static final int SHIELD_HOTBAR_SLOT = 1;
+
+    public static int equipShieldToMainHand(ServerPlayerEntity bot) {
+        var inventory = bot.getInventory();
+        int shieldSlot = findShield(inventory);
+        if (shieldSlot < 0 || shieldSlot == 40) return -1;
+
+        ItemStack shield = inventory.getStack(shieldSlot);
+        ItemStack slot2 = inventory.getStack(SHIELD_HOTBAR_SLOT);
+        inventory.setStack(SHIELD_HOTBAR_SLOT, shield);
+        inventory.setStack(shieldSlot, slot2);
+        org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, SHIELD_HOTBAR_SLOT);
+        return SHIELD_HOTBAR_SLOT;
+    }
+
+    public static void unequipShieldFromMainHand(ServerPlayerEntity bot) {
+        var inventory = bot.getInventory();
+        ItemStack shieldStack = inventory.getStack(SHIELD_HOTBAR_SLOT);
+        if (shieldStack.getItem() != Items.SHIELD) return;
+
+        for (int i = 9; i < 36; i++) {
+            if (inventory.getStack(i).isEmpty()) {
+                inventory.setStack(i, shieldStack);
+                inventory.setStack(SHIELD_HOTBAR_SLOT, ItemStack.EMPTY);
+                return;
+            }
+        }
+    }
+
+    private static void startMainHandBlocking(ServerPlayerEntity bot, BotState state, MinecraftServer server) {
+        state.savedMainHandSlot = org.stepan1411.pvp_bot.utils.InventoryHelper.getSelectedSlot(bot.getInventory());
+        equipShieldToMainHand(bot);
+        executeCommand(server, bot, "player " + bot.getName().getString() + " use continuous");
+        state.isBlocking = true;
+    }
+
+    private static void stopMainHandBlocking(ServerPlayerEntity bot, BotState state, MinecraftServer server) {
+        executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
+        state.isBlocking = false;
+        unequipShieldFromMainHand(bot);
+        if (state.savedMainHandSlot >= 0) {
+            org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(bot.getInventory(), state.savedMainHandSlot);
+            state.savedMainHandSlot = -1;
+        }
+    }
+
     public static void useWindCharge(ServerPlayerEntity bot, MinecraftServer server) {
         BotState state = getState(bot.getName().getString());
         if (state.windChargeCooldown > 0) return;

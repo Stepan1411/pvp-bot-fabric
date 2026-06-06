@@ -44,8 +44,12 @@ public class BotTicker {
             ServerPlayerEntity bot = BotManager.getBot(server, botName);
             if (bot != null && bot.isAlive()) {
 
-                BotUtils.update(bot, server);
-                
+                boolean isElytraMacing = BotCombat.isElytraMaceActive(botName);
+
+                if (!isElytraMacing) {
+                    BotUtils.update(bot, server);
+                    org.stepan1411.pvp_bot.fixes.EatingMovementFix.apply(bot);
+                }
 
                 boolean isFollowingWithoutAttack = BotPath.isFollowing(botName) && !BotPath.shouldAttack(botName);
                 if (!isFollowingWithoutAttack) {
@@ -115,7 +119,7 @@ public class BotTicker {
 
                 if (tickCounter >= interval) {
                     var utilsState = BotUtils.getState(botName);
-                    if (!utilsState.isEating) {
+                    if (!utilsState.isEating && !BotCombat.isElytraMaceActive(botName)) {
                         BotEquipment.autoEquip(bot);
                     }
                 }
