@@ -3,22 +3,16 @@
   "classpaths": {
     "test": [
       "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\classes\\java\\test",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\resources\\test",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\out\\test\\classes",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\out\\test\\resources"
+      "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\resources\\test"
     ],
     "client": [
       "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\classes\\java\\client",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\resources\\client",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\out\\client\\classes",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\out\\client\\resources"
+      "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\resources\\client"
     ],
     "main": [
       "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\classes\\java\\main",
       "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\resources\\main",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\devlibs\\PVP_bot-0.0.15-pre-release-1-dev.jar",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\out\\production\\classes",
-      "E:\\_IdeaProjects\\pvp-bot-fabric\\out\\production\\resources"
+      "E:\\_IdeaProjects\\pvp-bot-fabric\\build\\devlibs\\PVP_bot-0.0.15-pre-release-1-dev.jar"
     ]
   }
 }

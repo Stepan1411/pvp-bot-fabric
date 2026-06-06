@@ -103,10 +103,10 @@ public class BotCommand {
                     .then(CommandManager.literal("delete")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .executes(BotCommand::pathDelete)))
-                    .then(CommandManager.literal("addpoint")
+                    .then(CommandManager.literal("add-point")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .executes(BotCommand::pathAddPoint)))
-                    .then(CommandManager.literal("removepoint")
+                    .then(CommandManager.literal("remove-point")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .then(CommandManager.argument("index", IntegerArgumentType.integer())
                                 .executes(BotCommand::pathRemovePoint))
@@ -118,10 +118,6 @@ public class BotCommand {
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .then(CommandManager.argument("value", BoolArgumentType.bool())
                                 .executes(BotCommand::pathLoop))))
-                    .then(CommandManager.literal("attack")
-                        .then(CommandManager.argument("name", StringArgumentType.word())
-                            .then(CommandManager.argument("value", BoolArgumentType.bool())
-                                .executes(BotCommand::pathAttack))))
                     .then(CommandManager.literal("start")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
                             .suggests(BOT_SUGGESTIONS)
@@ -143,13 +139,23 @@ public class BotCommand {
                     .then(CommandManager.literal("distribute")
                         .then(CommandManager.argument("path", StringArgumentType.word())
                             .executes(BotCommand::pathDistribute)))
-                    .then(CommandManager.literal("startnear")
+                    .then(CommandManager.literal("start-near")
                         .then(CommandManager.argument("path", StringArgumentType.word())
                             .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1))
                                 .executes(BotCommand::pathStartNear))))
-                    .then(CommandManager.literal("stopall")
+                    .then(CommandManager.literal("stop-all")
                         .then(CommandManager.argument("path", StringArgumentType.word())
-                            .executes(BotCommand::pathStopAll)))))
+                            .executes(BotCommand::pathStopAll)))
+                    .then(CommandManager.literal("walk-type")
+                        .then(CommandManager.argument("name", StringArgumentType.word())
+                            .then(CommandManager.argument("type", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    builder.suggest("bhop");
+                                    builder.suggest("sprint");
+                                    builder.suggest("walk");
+                                    return builder.buildFuture();
+                                })
+                                .executes(BotCommand::pathWalkType))))))
 
             // ========== KIT ==========
             .then(CommandManager.literal("kit")
@@ -198,11 +204,11 @@ public class BotCommand {
                 .then(CommandManager.literal("info")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .executes(BotCommand::factionInfo)))
-                .then(CommandManager.literal("addnear")
+                .then(CommandManager.literal("add-near")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1, 10000))
                             .executes(BotCommand::factionAddNear))))
-                .then(CommandManager.literal("addall")
+                .then(CommandManager.literal("add-all")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .executes(BotCommand::factionAddAll)))
                 .then(CommandManager.literal("give")
@@ -214,14 +220,15 @@ public class BotCommand {
                         .then(CommandManager.argument("target", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionAttack))))
-                .then(CommandManager.literal("startpath")
-                    .then(CommandManager.argument("faction", StringArgumentType.word())
-                        .then(CommandManager.argument("path", StringArgumentType.word())
-                            .executes(BotCommand::factionStartPath))))
-                .then(CommandManager.literal("stoppath")
-                    .then(CommandManager.argument("faction", StringArgumentType.word())
-                        .executes(BotCommand::factionStopPath)))
-                .then(CommandManager.literal("givekit")
+                .then(CommandManager.literal("path")
+                    .then(CommandManager.literal("start")
+                        .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .then(CommandManager.argument("path", StringArgumentType.word())
+                                .executes(BotCommand::factionStartPath))))
+                    .then(CommandManager.literal("stop")
+                        .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .executes(BotCommand::factionStopPath))))
+                .then(CommandManager.literal("give-kit")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("kitname", StringArgumentType.word())
                             .suggests(KIT_SUGGESTIONS)
@@ -658,24 +665,6 @@ public class BotCommand {
         }
     }
 
-    private static int pathAttack(CommandContext<ServerCommandSource> ctx) {
-        var source = ctx.getSource();
-        String name = StringArgumentType.getString(ctx, "name");
-        boolean value = BoolArgumentType.getBool(ctx, "value");
-        if (BotPath.setAttack(name, value)) {
-            if (value) {
-                source.sendFeedback(() -> Text.literal("Path '" + name + "' attack: enabled"), true);
-            } else {
-                source.sendFeedback(() -> Text.literal("Path '" + name + "' attack: disabled"), true);
-                source.sendFeedback(() -> Text.literal("Bot will ignore attacks and continue following path"), false);
-            }
-            return 1;
-        } else {
-            source.sendError(Text.literal("Path '" + name + "' not found"));
-            return 0;
-        }
-    }
-
     private static int pathStart(CommandContext<ServerCommandSource> ctx) {
         var source = ctx.getSource();
         String bot = StringArgumentType.getString(ctx, "bot");
@@ -701,6 +690,23 @@ public class BotCommand {
         }
     }
 
+    private static int pathWalkType(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        String type = StringArgumentType.getString(ctx, "type");
+        if (!type.equals("bhop") && !type.equals("sprint") && !type.equals("walk")) {
+            source.sendError(Text.literal("Invalid walk type. Use: bhop, sprint, or walk"));
+            return 0;
+        }
+        if (BotPath.setWalkType(name, type)) {
+            source.sendFeedback(() -> Text.literal("Path '" + name + "' walk type: " + type), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Path '" + name + "' not found"));
+            return 0;
+        }
+    }
+
     private static int pathList(CommandContext<ServerCommandSource> ctx) {
         var source = ctx.getSource();
         var paths = BotPath.getAllPaths();
@@ -712,7 +718,7 @@ public class BotCommand {
         for (var entry : paths.entrySet()) {
             String name = entry.getKey();
             var path = entry.getValue();
-            source.sendFeedback(() -> Text.literal(String.format("%s: %d points, loop: %s, attack: %s", name, path.points.size(), path.loop, path.attack)), false);
+            source.sendFeedback(() -> Text.literal(String.format("%s: %d points, loop: %s, attack: %s, walk-type: %s", name, path.points.size(), path.loop, path.attack, path.walkType)), false);
         }
         return paths.size();
     }
@@ -747,6 +753,7 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("Points: " + path.points.size()), false);
         source.sendFeedback(() -> Text.literal("Loop: " + path.loop), false);
         source.sendFeedback(() -> Text.literal("Attack: " + path.attack), false);
+        source.sendFeedback(() -> Text.literal("Walk type: " + path.walkType), false);
         for (int i = 0; i < path.points.size(); i++) {
             var point = path.points.get(i);
             int index = i;

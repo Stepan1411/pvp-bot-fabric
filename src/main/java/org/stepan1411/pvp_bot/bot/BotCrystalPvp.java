@@ -467,6 +467,29 @@ public class BotCrystalPvp {
         bot.setVelocity(direction.x * speed, bot.getVelocity().y, direction.z * speed);
         bot.velocityDirty = true;
         
+        String botName = bot.getName().getString();
+        String pathWalkType = null;
+        if (BotPath.isFollowing(botName)) {
+            var follower = BotPath.getFollower(botName);
+            if (follower != null) {
+                var pathData = BotPath.getPath(follower.pathName);
+                if (pathData != null) {
+                    pathWalkType = pathData.walkType;
+                }
+            }
+        }
+        
+        if (pathWalkType != null) {
+            if (pathWalkType.equals("bhop") && bot.isOnGround()) {
+                bot.jump();
+                bot.setSprinting(true);
+            } else if (pathWalkType.equals("sprint")) {
+                bot.setSprinting(true);
+            } else if (pathWalkType.equals("walk")) {
+                bot.setSprinting(false);
+            }
+        }
+        
         lookAtEntity(bot, target);
     }
     

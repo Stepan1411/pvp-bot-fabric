@@ -170,6 +170,19 @@ public class BotNavigation {
 
         BotSettings settings = BotSettings.get();
 
+        // === PATH WALK TYPE ===
+        String botName = bot.getName().getString();
+        String pathWalkType = null;
+        if (BotPath.isFollowing(botName)) {
+            var follower = BotPath.getFollower(botName);
+            if (follower != null) {
+                var pathData = BotPath.getPath(follower.pathName);
+                if (pathData != null) {
+                    pathWalkType = pathData.walkType;
+                }
+            }
+        }
+
         // === JUMPING ===
         if (bot.isOnGround() && state.jumpCooldown <= 0) {
             if (canJumpUp) { bot.jump(); bot.addVelocity(dx * 0.2, 0, dz * 0.2); state.jumpCooldown = 8; }
@@ -193,7 +206,8 @@ public class BotNavigation {
         }
 
         // === BHOP ===
-        boolean shouldBhop = settings.isBhopEnabled() && speed >= 1.0 && !canJumpUp && !isWall && !holeAhead && state.jumpCooldown <= 0 && bot.isOnGround();
+        boolean useBhop = (pathWalkType != null) ? pathWalkType.equals("bhop") : settings.isBhopEnabled();
+        boolean shouldBhop = useBhop && speed >= 1.0 && !canJumpUp && !isWall && !holeAhead && state.jumpCooldown <= 0 && bot.isOnGround();
         if (shouldBhop) { bot.jump(); state.jumpCooldown = 10; }
 
         // === W-TAP ===
@@ -204,7 +218,8 @@ public class BotNavigation {
         }
 
         // === APPLY MOVEMENT ===
-        bot.setSprinting(!stopSprint);
+        boolean shouldSprint = pathWalkType == null || !pathWalkType.equals("walk");
+        bot.setSprinting(shouldSprint && !stopSprint);
         bot.forwardSpeed = stopSprint ? 0.5f : 1.0f;
         bot.sidewaysSpeed = combat ? state.strafeDir * 0.3f : 0;
 

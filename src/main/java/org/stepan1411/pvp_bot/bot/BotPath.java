@@ -31,6 +31,7 @@ public class BotPath {
         public List<Vec3d> points = new ArrayList<>();
         public boolean loop = false;
         public boolean attack = true;
+        public String walkType = "bhop";
         
         public PathData(String name) {
             this.name = name;
@@ -133,6 +134,17 @@ public class BotPath {
             return false;
         }
         path.attack = attack;
+        save();
+        return true;
+    }
+    
+    
+    public static boolean setWalkType(String pathName, String walkType) {
+        PathData path = paths.get(pathName);
+        if (path == null) {
+            return false;
+        }
+        path.walkType = walkType;
         save();
         return true;
     }
