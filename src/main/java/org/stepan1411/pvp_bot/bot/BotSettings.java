@@ -36,6 +36,7 @@ public class BotSettings {
     private int attackCooldown = 10;
     private double moveSpeed = 1.0;
     private boolean criticalsEnabled = true;
+    private int criticalFallTicks = 6;
     private int bowMinDrawTime = 15;
     private boolean rangedEnabled = true;
     private boolean maceEnabled = true;
@@ -143,6 +144,7 @@ public class BotSettings {
     public int getAttackCooldown() { return attackCooldown; }
     public double getMoveSpeed() { return moveSpeed; }
     public boolean isCriticalsEnabled() { return criticalsEnabled; }
+    public int getCriticalFallTicks() { return criticalFallTicks; }
     public int getBowMinDrawTime() { return bowMinDrawTime; }
     public boolean isRangedEnabled() { return rangedEnabled; }
     public boolean isMaceEnabled() { return maceEnabled; }
@@ -252,6 +254,10 @@ public class BotSettings {
         save(); 
     }
     public void setCriticalsEnabled(boolean value) { this.criticalsEnabled = value; save(); }
+    public void setCriticalFallTicks(int value) {
+        this.criticalFallTicks = Math.max(1, Math.min(10, value));
+        save();
+    }
     public void setBowMinDrawTime(int value) { 
         this.bowMinDrawTime = Math.max(5, Math.min(30, value)); 
         save(); 

@@ -74,6 +74,29 @@ jar {
     }
 }
 
+task downloadHeroBot {
+    def herobotDir = file("run/mods")
+    def herobotFile = file("run/mods/herobot-1.21.11-1.4.3+v260315.jar")
+    def herobotUrl = "https://cdn.modrinth.com/data/wt23fpWX/versions/9ig2SGA7/herobot-1.21.11-1.4.3%2Bv260315.jar"
+
+    outputs.file herobotFile
+
+    doLast {
+        if (!herobotFile.exists()) {
+            herobotDir.mkdirs()
+            logger.lifecycle("Downloading HeroBot...")
+            new URL(herobotUrl).withInputStream { i ->
+                herobotFile.withOutputStream { it << i }
+            }
+            logger.lifecycle("HeroBot downloaded to ${herobotFile}")
+        } else {
+            logger.lifecycle("HeroBot already present: ${herobotFile}")
+        }
+    }
+}
+
+runClient.dependsOn downloadHeroBot
+
 publishing {
     publications {
         mavenJava(MavenPublication) {

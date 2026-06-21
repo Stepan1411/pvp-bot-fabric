@@ -50,6 +50,14 @@ public class BotCommand {
             return builder.buildFuture();
         };
 
+    private static final SuggestionProvider<ServerCommandSource> PATH_SUGGESTIONS =
+        (ctx, builder) -> {
+            for (String pathName : BotPath.getAllPaths().keySet()) {
+                builder.suggest(pathName);
+            }
+            return builder.buildFuture();
+        };
+
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(CommandManager.literal("pvpbot")
             .requires(s -> true)
@@ -99,29 +107,36 @@ public class BotCommand {
                 .then(CommandManager.literal("path")
                     .then(CommandManager.literal("create")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathCreate)))
                     .then(CommandManager.literal("delete")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathDelete)))
                     .then(CommandManager.literal("add-point")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathAddPoint)))
                     .then(CommandManager.literal("remove-point")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("index", IntegerArgumentType.integer())
                                 .executes(BotCommand::pathRemovePoint))
                             .executes(BotCommand::pathRemovePointLast)))
                     .then(CommandManager.literal("clear")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathClear)))
                     .then(CommandManager.literal("loop")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("value", BoolArgumentType.bool())
                                 .executes(BotCommand::pathLoop))))
                     .then(CommandManager.literal("start")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
                             .suggests(BOT_SUGGESTIONS)
                             .then(CommandManager.argument("path", StringArgumentType.word())
+                                .suggests(PATH_SUGGESTIONS)
                                 .executes(BotCommand::pathStart))))
                     .then(CommandManager.literal("stop")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
@@ -131,23 +146,29 @@ public class BotCommand {
                         .executes(BotCommand::pathList))
                     .then(CommandManager.literal("show")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("visible", BoolArgumentType.bool())
                                 .executes(BotCommand::pathShow))))
                     .then(CommandManager.literal("info")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathInfo)))
                     .then(CommandManager.literal("distribute")
                         .then(CommandManager.argument("path", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathDistribute)))
                     .then(CommandManager.literal("start-near")
                         .then(CommandManager.argument("path", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1))
                                 .executes(BotCommand::pathStartNear))))
                     .then(CommandManager.literal("stop-all")
                         .then(CommandManager.argument("path", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathStopAll)))
                     .then(CommandManager.literal("walk-type")
                         .then(CommandManager.argument("name", StringArgumentType.word())
+                            .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("type", StringArgumentType.word())
                                 .suggests((ctx, builder) -> {
                                     builder.suggest("bhop");
@@ -256,6 +277,7 @@ public class BotCommand {
         settings.then(boolSetting("target-mobs", () -> BotSettings.get().isTargetHostileMobs(), v -> BotSettings.get().setTargetHostileMobs(v)));
         settings.then(boolSetting("target-bots", () -> BotSettings.get().isTargetOtherBots(), v -> BotSettings.get().setTargetOtherBots(v)));
         settings.then(boolSetting("criticals", () -> BotSettings.get().isCriticalsEnabled(), v -> BotSettings.get().setCriticalsEnabled(v)));
+        settings.then(intSetting("crit-fall-ticks", () -> BotSettings.get().getCriticalFallTicks(), v -> BotSettings.get().setCriticalFallTicks(v), 1, 10));
         settings.then(boolSetting("ranged", () -> BotSettings.get().isRangedEnabled(), v -> BotSettings.get().setRangedEnabled(v)));
         settings.then(boolSetting("mace", () -> BotSettings.get().isMaceEnabled(), v -> BotSettings.get().setMaceEnabled(v)));
         settings.then(boolSetting("special-names", () -> BotSettings.get().isUseSpecialNames(), v -> BotSettings.get().setUseSpecialNames(v)));

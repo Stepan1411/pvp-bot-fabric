@@ -66,6 +66,7 @@ public class BotCombat {
         public int shieldPredictTicks = 0;
         public int shieldHoldTicks = 0;
         public int shieldHitTicks = 0;
+        public int critFallTicks = 0;
         
         public enum WeaponMode {
             MELEE,
@@ -968,14 +969,14 @@ public class BotCombat {
             if (settings.isCriticalsEnabled()) {
                 if (bot.isOnGround()) {
                     bot.jump();
+                    state.critFallTicks = 0;
                     return;
-                } else {
-                    double velocityY = bot.getVelocity().y;
-                    
-
-                    if (velocityY < 0) {
-                        attackWithCarpet(bot, target, server);
-                        
+                } else if (bot.getVelocity().y < 0) {
+                    state.critFallTicks++;
+                    if (state.critFallTicks >= settings.getCriticalFallTicks()) {
+                        bot.fallDistance = 1.0f;
+                        attack(bot, target);
+                        state.critFallTicks = 0;
                         int cooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
                         state.attackCooldown = cooldown;
                     }
