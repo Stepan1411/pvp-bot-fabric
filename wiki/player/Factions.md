@@ -1,159 +1,70 @@
-# 👥 Faction System
+# Factions
 
-Organize bots and players into teams that can fight each other!
+Organize bots into teams/factions for coordinated battles. Factions are saved per-world in `config/pvpbot/worlds/<worldname>/factions.json`.
 
----
+## Basic Commands
 
-## 📖 Overview
-
-Factions are groups of bots and players. You can:
-- Create teams of bots
-- Set factions as hostile to each other
-- Bots automatically attack enemies from hostile factions
-
----
-
-## 🏗️ Creating Factions
-
-```mcfunction
-# Create a faction
-/pvpbot faction create RedTeam
-
-# Delete a faction
-/pvpbot faction delete RedTeam
-
-# List all factions
-/pvpbot faction list
-
-# Get faction info
-/pvpbot faction info RedTeam
+### Create and Delete
+```
+/pvpbot faction create Red
+/pvpbot faction delete Red
 ```
 
----
-
-## 👤 Managing Members
-
-### Add Members
-```mcfunction
-# Add a bot to faction
-/pvpbot faction add RedTeam Bot1
-
-# Add a player to faction
-/pvpbot faction add RedTeam Steve
-
-# Add all nearby bots (within 20 blocks)
-/pvpbot faction addnear RedTeam 20
+### Manage Members
+```
+/pvpbot faction add Red Bot1
+/pvpbot faction remove Red Bot1
+/pvpbot faction add-near Red 30          # Add all bots within 30 blocks
+/pvpbot faction add-all Red              # Add all existing bots
 ```
 
-### Remove Members
-```mcfunction
-/pvpbot faction remove RedTeam Bot1
+### Check Info
+```
+/pvpbot faction list              # List all factions
+/pvpbot faction info Red          # Show members and enemies
 ```
 
----
+## Hostile Relations
 
-## ⚔️ Hostile Relations
+Set factions as enemies. Bots will automatically attack enemy faction members.
 
-Make factions enemies - their members will automatically attack each other!
-
-```mcfunction
-# Make factions hostile
-/pvpbot faction hostile RedTeam BlueTeam
-
-# Make factions neutral again
-/pvpbot faction hostile RedTeam BlueTeam false
+```
+/pvpbot faction hostile Red Blue
+/pvpbot faction hostile Red Neutral false
 ```
 
-### How It Works
-1. Bot from RedTeam sees player/bot from BlueTeam
-2. If factions are hostile, bot automatically targets them
-3. Combat begins!
+**Note:** Enemies are always mutual — setting Red hostile to Blue also makes Blue hostile to Red.
 
-> **Note:** Requires `autotarget` to be enabled for automatic targeting.
+## Coordinated Actions
 
----
-
-## 🎁 Giving Items
+### Attack
+All faction members attack a target:
+```
+/pvpbot faction attack Red GreenPlayer
+```
 
 ### Give Items
-```mcfunction
-# Give diamond sword to all faction members
-/pvpbot faction give RedTeam diamond_sword
-
-# Give multiple items
-/pvpbot faction give RedTeam diamond_sword 1
-/pvpbot faction give RedTeam golden_apple 16
+Give items to all faction members:
+```
+/pvpbot faction give Red diamond_sword 1
 ```
 
-### Give Kits
-```mcfunction
-# Give a saved kit to entire faction
-/pvpbot faction givekit RedTeam warrior
+### Give Kit
+Equip all members with a kit:
+```
+/pvpbot faction give-kit Red MyKit
 ```
 
----
-
-## 📋 Complete Example
-
-Create two teams and make them fight:
-
-```mcfunction
-# Create bots
-/pvpbot spawn Red1
-/pvpbot spawn Red2
-/pvpbot spawn Red3
-/pvpbot spawn Blue1
-/pvpbot spawn Blue2
-/pvpbot spawn Blue3
-
-# Create factions
-/pvpbot faction create Red
-/pvpbot faction create Blue
-
-# Add bots to factions
-/pvpbot faction add Red Red1
-/pvpbot faction add Red Red2
-/pvpbot faction add Red Red3
-/pvpbot faction add Blue Blue1
-/pvpbot faction add Blue Blue2
-/pvpbot faction add Blue Blue3
-
-# Make them enemies
-/pvpbot faction hostile Red Blue
-
-# Give equipment
-/pvpbot faction give Red diamond_sword
-/pvpbot faction give Blue diamond_sword
-/pvpbot faction give Red diamond_chestplate
-/pvpbot faction give Blue diamond_chestplate
-
-# Enable auto-targeting
-/pvpbot settings autotarget true
-
-# Watch the battle!
+### Path Following
+All members follow a path:
+```
+/pvpbot faction path start Red MyPath
+/pvpbot faction path stop Red
 ```
 
----
+## Settings
 
-## ⚙️ Settings
-
-```mcfunction
-# Enable/disable faction system
-/pvpbot settings factions true
-
-# Enable/disable friendly fire (damage to allies)
-/pvpbot settings friendlyfire false
-```
-
-When friendly fire is disabled (default), bots cannot damage members of their own faction or allied factions.
-
----
-
-## 💾 Data Storage
-
-Faction data is saved in:
-```
-config/pvp_bot_factions.json
-```
-
-This file persists across server restarts.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| factions | true | Enable faction system |
+| friendly-fire | false | Allow attacking own faction members |

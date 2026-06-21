@@ -1,12 +1,11 @@
 Subscribe to Stepan1411
 PvP Bot mod made by Stepan1411
-PvP Bot mod very unstable
 Repots bugs on GitHub!
 You speak on Русский?
-PvP Bot contains 13633 lines of code!
-PvP Bot written by Claude Sonnet 4.5
+PvP Bot contains 9059 lines of code!
+PvP Bot written by DeepSeek V4 Flash
 Is PvP Bot an AI slop?
-Hello PvP Bot 0.0.14!
+Hello PvP Bot 0.0.15!
 Try PvP Bot 0.0.1 :)
 Okak
 They see your every move...

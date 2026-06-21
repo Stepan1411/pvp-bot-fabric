@@ -24,10 +24,7 @@ PVP Bot is a Minecraft Fabric mod that adds intelligent combat bots powered by H
 |------|-------------|
 | [🎮 Commands](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Commands) | All available commands |
 | [⚔️ Combat System](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Combat) | How bots fight |
-| [💥 Explosive Combat](https://github.com/Stepan1411/pvp-bot-fabric/wiki/ExplosiveCombat) | Crystal PVP and Anchor PVP |
-| [🚀 ElytraMace](https://github.com/Stepan1411/pvp-bot-fabric/wiki/ElytraMace) | Advanced aerial combat technique |
 | [🚶 Navigation](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Navigation) | Basic pathfinding |
-| [🏃 Movement](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Movement) | Follow, escort, and goto commands |
 | [🛤️ Paths](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Paths) | Path system and waypoints |
 | [👥 Factions](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Factions) | Team system |
 | [🎒 Kits](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Kits) | Equipment presets |
@@ -44,22 +41,12 @@ PVP Bot is a Minecraft Fabric mod that adds intelligent combat bots powered by H
 
 ### Enable Crystal PVP
 ```
-/pvpbot settings crystalpvp true
+/pvpbot settings crystal-pvp true
 ```
 
 ### Enable ElytraMace trick
 ```
-/pvpbot settings elytramace true
-```
-
-### Make bot follow a player
-```
-/pvpbot follow Bot1 Steve
-```
-
-### Make bot escort (follow + protect) a player
-```
-/pvpbot escort Bot1 Steve
+/pvpbot settings elytra-mace true
 ```
 
 ### Make two teams fight

@@ -9,28 +9,6 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 
 # [![github](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/github_64h.png)](https://github.com/Stepan1411/pvp-bot-fabric) [![jitpack](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/jitpack_64h.png) ](https://jitpack.io/#Stepan1411/pvp-bot-fabric)[![modrinth](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/modrinth_64h.png) ](https://modrinth.com/mod/pvp-bot-fabric)[![ghpages](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/documentation/ghpages_64h.png)](https://stepan1411.github.io/pvpbot-docs.html)
 
----
-
-## 🔌 Developer API
-
-PVP Bot Fabric provides a powerful API for creating addons and extensions!
-
-### API Features
-- **Events** - track bot spawn, death, attacks, and damage
-- **Combat Strategies** - create custom combat logic
-- **Integration** - easily integrate with other mods
-- **Utilities** - access settings and statistics
-
-### Quick Example
-```java
-PvpBotAPI.getEventManager().registerSpawnHandler(bot -> {
-    System.out.println("Bot spawned: " + bot.getName().getString());
-});
-```
-
-📖 [Full API Documentation](API_README.md) | [Code Examples](wiki/developer/Examples.md)
-
----
 
 ## 🎮 Main Features
 
@@ -45,60 +23,54 @@ PvpBotAPI.getEventManager().registerSpawnHandler(bot -> {
 - **Critical hits** when jumping
 - **Many weapon types**:
   - Melee: swords, axes
-  - Ranged: bows, crossbows (IN DEVELOPMENT)
-  - Mace with jumping attacks
-  - **ElytraMace trick** - advanced aerial mace attacks with elytra
+  - Ranged: bows, crossbows
+  - Mace with jumping attacks (wind charges)
   - Crystal PVP (obsidian + crystals)
   - Anchor PVP (respawn anchor + glowstone)
-  - Spear - 1.21.11+ (IN DEVELOPMENT)
+- **Auto-potions** healing, strength, speed, fire resistance
+- **Shield mechanics** - blocking, shield breaking, mace defense prediction
 
 ### 🛡️ Utilities and Survival
 - **Auto-equip** armor and weapons
 - **Auto-totem** offhand
 - **Auto-shield** on low HP
 - **Auto-food**
-- **Auto-potions** healing, strength, speed, fire resistance
 - **Auto-repair** armor with Mending XP bottles
-- **Shield down**
-- **Web use**
+- **Cobweb use** to slow enemies
 
 ### 🚶 Navigation and Movement
-- **Follow system** - bots can follow players or other bots
-- **Escort mode** - follow and protect a target
-- **Goto commands** - move bots to specific coordinates
-- **Baritone integration** - smart pathfinding (configurable)
-- **Bunny hop**
+- **Bunny hop** for faster travel
 - **Adjustable speed**
 - **Wander mode** when no target
 - **Retreat** on low HP
-- **Smart navigation** to targets (and items IN DEVELOPMENT)
+- **Smart navigation** to targets
+- **Combat strafing**
+- **Path following system**
 
 ### 👥 Faction System
 - **Faction creation** for bots
-- **Allies and enemies** - bots do not attack allies
-- **Member Management**
-- **Friendly Fire**
+- **Hostile relations** - set factions as enemies for automatic combat
+- **Member Management** - add/remove bots and players
+- **Faction-wide commands** - attack, give items, follow paths
+- **Friendly Fire** toggle
 
 ### 🎒 Kit System
-- **Creating Sets**
-- **Giving Out kits**
-- **Saving kits**
+- **Creating kits** from your inventory
+- **Giving kits** to bots and factions
+- **Saving kits** across restarts
 
 ### 🛤️ Path System
 - **Create paths** for bots to follow
 - **Add waypoints** to paths
 - **Loop mode** - back-and-forth or circular movement
-- **Combat mode** - stop for combat or continue moving
+- **Walk types** - bhop, sprint, or walk
 - **Visual indicators** - particles showing path points and lines
+- **Distribute** bots evenly along a path
 
 ### 🎯 Realism
 - **Miss Chance**
-- **Error Chance**
-- **Reaction Latency**
-
-### 📊 Statistics
-- **Anonymous Statistics**
-- **Website** https://stepan1411.github.io/pvpbot-stats/
+- **Mistake Chance** - attack wrong direction
+- **Shield Break Chance**
 
 ---
 
@@ -106,238 +78,114 @@ PvpBotAPI.getEventManager().registerSpawnHandler(bot -> {
 
 ### Basic Commands
 ```
-/pvpbot spawn [name] - Spawn a bot (no name = random)
-```
-```
-/pvpbot massspawn <count> - Spawn multiple bots (1-50)
-```
-```
-/pvpbot remove <name> - Remove bot
-```
-```
-/pvpbot removeall - Remove all bots
-```
-```
-/pvpbot list - List all bots
-```
-```
-/pvpbot menu - Open the test menu
+/pvpbot spawn [name]          - Spawn a bot (random name if not specified)
+/pvpbot remove <name>         - Remove a bot
+/pvpbot removeall             - Remove all bots
+/pvpbot reload                - Reload all configurations
 ```
 
-### Movement Commands
+### Bot Management
 ```
-/pvpbot follow <bot> <target> - Make bot follow a player/bot
-```
-```
-/pvpbot escort <bot> <target> - Make bot follow and protect a target
-```
-```
-/pvpbot goto <bot> <x> <y> <z> - Move bot to coordinates
-```
-```
-/pvpbot stopmovement <bot> - Stop bot movement
+/pvpbot bot-management list              - List all active bots
+/pvpbot bot-management inventory <name>  - Show bot's inventory
+/pvpbot bot-management mass-spawn <count> - Spawn multiple bots (1-50)
+/pvpbot bot-management attack <bot> <target> - Order bot to attack
+/pvpbot bot-management stop-attack <bot>     - Stop bot from attacking
 ```
 
 ### Settings
 ```
-/pvpbot settings - Show all settings
-```
-```
-/pvpbot settings autoarmor [true/false] - Auto-equip armor
-```
-```
-/pvpbot settings autoweapon [true/false] - Auto-equip weapons
-```
-```
-/pvpbot settings droparmor [true/false] - Drop inferior armor
-```
-```
-/pvpbot settings dropweapon [true/false] - Drop inferior weapons
-```
-```
-/pvpbot settings dropdistance <1-10> - Item pickup distance
-```
-```
-/pvpbot settings minarmorlevel <0-100> - Minimum armor level
-```
-```
-/pvpbot settings interval <1-100> - Check interval (ticks)
-```
-
-### Combat
-```
-/pvpbot settings combat [true/false] - Enable combat
-```
-```
-/pvpbot settings revenge [true/false] - Revenge mode
-```
-```
-/pvpbot settings autotarget [true/false] - Automatic target search
-```
-```
-/pvpbot settings targetplayers [true/false] - Attack players
-```
-```
-/pvpbot settings targetmobs [true/false] - Attack mobs
-```
-```
-/pvpbot settings targetbots [true/false] - Attack other bots
-```
-```
-/pvpbot settings criticals [true/false] - Critical hits
-```
-```
-/pvpbot settings ranged [true/false] - Use bow/crossbow
-```
-```
-/pvpbot settings mace [true/false] - Use mace
-```
-```
-/pvpbot settings elytramace [true/false] - Use ElytraMace trick
-```
-```
-/pvpbot settings attackcooldown <1-40> - Attack cooldown (ticks)
-```
-```
-/pvpbot settings meleerange <2-6> - Melee range
-```
-```
-/pvpbot settings movespeed <0.1-2.0> - Movement speed
+/pvpbot settings                          - Show all settings
+/pvpbot settings auto-armor [true/false]  - Auto-equip armor
+/pvpbot settings auto-weapon [true/false] - Auto-equip weapons
+/pvpbot settings drop-armor [true/false]  - Drop worse armor
+/pvpbot settings drop-weapon [true/false] - Drop worse weapons
+/pvpbot settings drop-distance <1-10>     - Item pickup distance
+/pvpbot settings interval <1-100>         - Check interval (ticks)
+/pvpbot settings combat [true/false]      - Enable combat
+/pvpbot settings revenge [true/false]     - Revenge mode
+/pvpbot settings auto-target [true/false] - Auto target search
+/pvpbot settings target-players [true/false] - Attack players
+/pvpbot settings target-mobs [true/false]    - Attack mobs
+/pvpbot settings target-bots [true/false]    - Attack other bots
+/pvpbot settings criticals [true/false]      - Critical hits
+/pvpbot settings ranged [true/false]         - Use bow/crossbow
+/pvpbot settings mace [true/false]           - Use mace
+/pvpbot settings attack-cooldown <1-40>      - Attack cooldown (ticks)
+/pvpbot settings melee-range <2-6>           - Melee range
+/pvpbot settings move-speed <0.1-2.0>        - Movement speed
+/pvpbot settings view-distance <5-128>       - Target search range
+/pvpbot settings retreat [true/false]        - Retreat when low HP
+/pvpbot settings auto-totem [true/false]     - Auto-equip totem
+/pvpbot settings totem-priority [true/false] - Totem over shield
+/pvpbot settings auto-shield [true/false]    - Auto-use shield
+/pvpbot settings shield-break [true/false]   - Break shields with axe
+/pvpbot settings shield-break-chance <0-100> - Shield break chance (%)
+/pvpbot settings shield-hold-ticks <10-200>  - Max shield hold ticks
+/pvpbot settings shield-raise-ticks <2-40>   - Shield raise ticks
+/pvpbot settings shield-mace [true/false]    - Raise shield vs mace
+/pvpbot settings prefer-sword [true/false]   - Prefer sword over axe
+/pvpbot settings auto-eat [true/false]       - Auto-eat food
+/pvpbot settings auto-potion [true/false]    - Auto-use potions
+/pvpbot settings auto-mend [true/false]      - Auto-repair armor
+/pvpbot settings bhop [true/false]           - Bunny hop
+/pvpbot settings idle [true/false]           - Wander without target
+/pvpbot settings idle-radius <3-50>          - Wander radius
+/pvpbot settings friendly-fire [true/false]  - Damage allies
+/pvpbot settings miss-chance <0-100>         - Miss chance (%)
+/pvpbot settings mistake-chance <0-100>      - Mistake chance (%)
+/pvpbot settings aim-speed <3-45>            - Rotation speed
+/pvpbot settings special-names [true/false]  - Use special names
+/pvpbot settings bot-leave-on-death [true/false] - Remove on death
+/pvpbot settings attack-invincible [true/false]  - Attack creative players
 ```
 
-### ElytraMace Settings
+### Faction Commands
 ```
-/pvpbot settings elytramaceretries <1-10> - Max takeoff attempts (default: 3)
-```
-```
-/pvpbot settings elytramacealtitude <5-50> - Min altitude for takeoff (default: 15)
-```
-```
-/pvpbot settings elytramacedistance <3-15> - Attack distance (default: 6.0)
-```
-```
-/pvpbot settings elytramacefireworks <1-10> - Firework count (default: 3)
-```
-
-### Utilities
-```
-/pvpbot settings autoshield [true/false] - Autoshield
-```
-```
-/pvpbot settings shieldbreak [true/false] - Break shields with an axe
-```
-```
-/pvpbot settings prefersword [true/false] - Prefer sword over axe
+/pvpbot faction list                          - List all factions
+/pvpbot faction create <name>                 - Create a faction
+/pvpbot faction delete <name>                 - Delete a faction
+/pvpbot faction info <faction>                - Faction information
+/pvpbot faction add <faction> <player>        - Add player/bot
+/pvpbot faction remove <faction> <player>     - Remove player/bot
+/pvpbot faction add-near <faction> <radius>   - Add nearby bots
+/pvpbot faction add-all <faction>             - Add all bots
+/pvpbot faction hostile <f1> <f2> [true/false] - Set hostile
+/pvpbot faction attack <faction> <target>     - All bots attack
+/pvpbot faction give <faction> <item>         - Give item to all
+/pvpbot faction give-kit <faction> <kit>      - Give kit to all
+/pvpbot faction path start <faction> <path>   - Start path
+/pvpbot faction path stop <faction>           - Stop path
 ```
 
-### Navigation
+### Kit Commands
 ```
-/pvpbot settings bhop [true/false] - Bunny hop
-```
-```
-/pvpbot settings bhopcooldown <5-30> - Jump cooldown (ticks)
-```
-```
-/pvpbot settings jumpboost <0-0.5> - Height Jump
-```
-```
-/pvpbot settings idle [true/false] - Wander without a target
-```
-```
-/pvpbot settings idleradius <3-50> - Wander radius
-```
-```
-/pvpbot settings gotousebaritone [true/false] - Use Baritone for goto commands
+/pvpbot kit create-kit <name>            - Create a kit from your inventory
+/pvpbot kit delete-kit <name>            - Delete a kit
+/pvpbot kit kits                         - List all kits
+/pvpbot kit give-kit <player> <kit>      - Give kit to a player/bot
 ```
 
-### Special Names
+### Path Commands
 ```
-/pvpbot settings specialnames [true/false] - Use special names from database
-```
-
-### Realism
-```
-/pvpbot settings friendlyfire [true/false] - Damage to allies
-```
-```
-/pvpbot settings misschance <0-100> - Miss chance (%)
-```
-```
-/pvpbot settings mistakechance <0-100> - Error chance (%)
-```
-```
-/pvpbot settings reactiondelay <0-20> - Reaction delay (ticks)
-```
-
-### Factions
-```
-/pvpbot faction create <name> - Create a faction
-```
-```
-/pvpbot faction delete <name> - Delete a faction
-```
-```
-/pvpbot faction join <faction> <player> - Add a player/bot
-```
-```
-/pvpbot faction leave <faction> <player> - Delete player/bot
-```
-```
-/pvpbot faction list - List of factions
-```
-```
-/pvpbot faction info <name> - Faction information
-```
-```
-/pvpbot faction ally <faction1> <faction2> - Create alliance
-```
-```
-/pvpbot faction follow <faction> <target> - All bots follow target
-```
-```
-/pvpbot faction escort <faction> <target> - All bots escort target
-```
-```
-/pvpbot faction goto <faction> <x> <y> <z> - Move all bots to coordinates
+/pvpbot path create <name>                    - Create a new path
+/pvpbot path delete <name>                    - Delete a path
+/pvpbot path add-point <name>                 - Add waypoint (current pos)
+/pvpbot path remove-point <name> [index]      - Remove waypoint
+/pvpbot path clear <name>                     - Remove all waypoints
+/pvpbot path list                             - List all paths
+/pvpbot path info <name>                      - Show path information
+/pvpbot path loop <name> <true/false>         - Toggle loop mode
+/pvpbot path walk-type <name> <type>          - Set walk type (bhop/sprint/walk)
+/pvpbot path show <name> <true/false>         - Toggle visualization
+/pvpbot path start <bot> <path>               - Make bot follow path
+/pvpbot path stop <bot>                       - Stop bot from following
+/pvpbot path distribute <path>                - Distribute bots evenly
+/pvpbot path start-near <path> <radius>       - Start path for nearby bots
+/pvpbot path stop-all <path>                  - Stop all bots on path
 ```
 
-### Paths
-```
-/pvpbot path create <name> - Create a new path
-```
-```
-/pvpbot path delete <name> - Delete a path
-```
-```
-/pvpbot path add <name> - Add current position as waypoint
-```
-```
-/pvpbot path remove <name> <index> - Remove waypoint by index
-```
-```
-/pvpbot path clear <name> - Remove all waypoints
-```
-```
-/pvpbot path list - List all paths
-```
-```
-/pvpbot path info <name> - Show path information
-```
-```
-/pvpbot path start <bot> <path> - Make bot follow path
-```
-```
-/pvpbot path stop <bot> - Stop bot from following path
-```
-```
-/pvpbot path loop <name> <true/false> - Toggle loop mode (back-and-forth)
-```
-```
-/pvpbot path attack <name> <true/false> - Toggle combat mode (stop for combat)
-```
-```
-/pvpbot path show <name> <true/false> - Toggle path visualization
-```
+---
 
 ## 🖼️ Screenshots
  - Bots in battle
@@ -370,10 +218,5 @@ PvpBotAPI.getEventManager().registerSpawnHandler(bot -> {
 - **GitHub**: https://github.com/Stepan1411/pvp-bot-fabric
 - **Issues**: https://github.com/Stepan1411/pvp-bot-fabric/issues
 - **Wiki**: https://github.com/Stepan1411/pvp-bot-fabric/wiki
-- **Statistics**: https://stepan1411.github.io/pvp-bot-fabric/
-- **Developer API**: [API Documentation](API_README.md)
 
-
-Made for my friend [Nantag](https://youtube.com/@nantagmc?si=jCx-NguyQ5zxGm_w) he does really cool videos go check them out if you want
-
-**Have a nice game! 🎮**
+**Have a nice pvp! 🎮**

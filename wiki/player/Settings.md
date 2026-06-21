@@ -1,215 +1,116 @@
-# ⚙️ Settings
+# Settings
 
-Complete list of all configuration options.
+All settings are saved per-world in `config/pvpbot/worlds/<worldname>/settings.json`.
 
----
+## Viewing and Changing
 
-## 📋 Commands
-
-```mcfunction
-# Show all settings
-/pvpbot settings
-
-# Show specific setting
-/pvpbot settings <name>
-
-# Change setting
-/pvpbot settings <name> <value>
+```
+/pvpbot settings                # List all settings
+/pvpbot settings combat         # View a single setting
+/pvpbot settings combat false   # Change a setting
 ```
 
----
+## Equipment Settings
 
-## ⚔️ Combat Settings
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| auto-armor | bool | true | - | Equip best armor from inventory |
+| auto-weapon | bool | true | - | Equip best weapon to hotbar |
+| drop-armor | bool | false | - | Drop worse armor when replacing |
+| drop-weapon | bool | false | - | Drop worse weapons when replacing |
+| drop-distance | double | 3.0 | 1.0 - 10.0 | Distance to drop items |
+| interval | int | 20 | 1 - 100 | Equipment check interval (ticks) |
 
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `combat` | bool | - | true | Enable/disable combat system |
-| `revenge` | bool | - | true | Attack entities that damage the bot |
-| `autotarget` | bool | - | false | Automatically search for enemies |
-| `targetplayers` | bool | - | true | Can target players |
-| `targetmobs` | bool | - | false | Can target hostile mobs |
-| `targetbots` | bool | - | false | Can target other bots |
-| `criticals` | bool | - | true | Perform critical hits |
-| `ranged` | bool | - | true | Use bows/crossbows |
-| `mace` | bool | - | true | Use mace with wind charges |
-| `spear` | bool | - | false | Use spear (disabled due to Carpet bug) |
-| `crystalpvp` | bool | - | false | Use crystal PVP (obsidian + crystals) |
-| `anchorpvp` | bool | - | false | Use anchor PVP (respawn anchor + glowstone) |
-| `elytramace` | bool | - | true | Use ElytraMace trick (elytra + mace) |
-| `attackcooldown` | int | 1-40 | 10 | Ticks between attacks |
-| `meleerange` | double | 2-6 | 3.5 | Melee attack distance |
-| `movespeed` | double | 0.1-2.0 | 1.0 | Movement speed multiplier |
-| `viewdistance` | double | 5-128 | 64 | Maximum target detection range |
-| `retreat` | bool | - | true | Retreat when low HP |
-| `retreathp` | double | 0.1-0.9 | 0.3 | HP percent to start retreat (30%) |
+## Combat Settings
 
----
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| combat | bool | true | - | Enable combat system |
+| revenge | bool | true | - | Auto-attack last damager |
+| auto-target | bool | false | - | Auto-acquire nearest target |
+| target-players | bool | true | - | Target real players |
+| target-mobs | bool | false | - | Target hostile mobs |
+| target-bots | bool | false | - | Target other bots |
+| view-distance | double | 64.0 | 5.0 - 128.0 | Max target search range |
+| attack-invincible | bool | false | - | Attack creative/spectator players |
+| attack-cooldown | int | 10 | 1 - 40 | Ticks between attacks |
+| criticals | bool | true | - | Jump for critical hits |
+| melee-range | double | 3.5 | 2.0 - 6.0 | Melee reach distance |
+| move-speed | double | 1.0 | 0.1 - 2.0 | Movement speed multiplier |
+| miss-chance | int | 0 | 0 - 100 | % chance to miss attacks |
+| mistake-chance | int | 0 | 0 - 100 | % chance to aim incorrectly |
+| aim-speed | double | 60.0 | 3.0 - 90.0 | Rotation speed (deg/sec) |
 
-## 🧪 Potion Settings
+## Weapon Settings
 
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `autopotion` | bool | - | true | Auto-use healing/buff potions |
-| `cobweb` | bool | - | true | Use cobwebs to slow enemies |
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| ranged | bool | true | - | Enable bow/crossbow combat |
+| mace | bool | true | - | Enable mace combat |
+| spear | bool | false | - | Enable spear combat |
+| crystalpvp | bool | true | - | Enable Crystal PVP |
+| anchorpvp | bool | true | - | Enable Anchor PVP |
+| prefer-sword | bool | true | - | Prefer swords over axes |
+| shield-mace | bool | true | - | Auto-shield against mace attacks |
+| special-names | bool | false | - | Use special names list |
+| bow-min-draw | int | 15 | 5 - 30 | Min bow draw ticks |
+| mace-range | double | 6.0 | 3.0 - 10.0 | Mace attack range |
+| spear-range | double | 4.5 | 2.0 - 8.0 | Spear attack range |
+| spear-charge-range | double | 12.0 | 5.0 - 20.0 | Spear charge start range |
+| ranged-min-range | double | 8.0 | 3.0 - 20.0 | Min ranged engagement distance |
+| ranged-optimal | double | 20.0 | 10.0 - 50.0 | Optimal ranged distance |
 
-Bots automatically use:
-- **Healing potions** when HP is low
-- **Strength potions** when entering combat
-- **Speed potions** when entering combat  
-- **Fire resistance potions** when entering combat
-- **Cobwebs** to slow down enemies (when retreating or enemy is charging)
+## Utility Settings
 
-All buff potions are thrown at once when combat starts or when effects expire.
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| auto-totem | bool | true | - | Auto-equip totem of undying |
+| totem-priority | bool | true | - | Keep totem in offhand over shield |
+| auto-eat | bool | true | - | Auto-eat when hungry |
+| auto-shield | bool | true | - | Auto-raise shield when needed |
+| auto-potion | bool | true | - | Use healing pots at low health |
+| auto-mend | bool | true | - | Use XP bottles to repair gear |
+| shield-break | bool | true | - | Axe-shield-break blocking enemies |
+| cobweb | bool | true | - | Place cobwebs on targets |
+| min-hunger | int | 14 | 1 - 20 | Hunger level to start eating |
+| mend-threshold | double | 0.25 | 0.1 - 0.9 | Durability % to trigger mending |
+| shield-health | double | 0.5 | 0.1 - 1.0 | Health % to hold shield |
 
----
+## Retreat Settings
 
-## 🚶 Navigation Settings
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| retreat | bool | true | - | Enable retreat behavior |
+| retreat-health | double | 0.3 | 0.1 - 0.9 | Health % to start retreating |
+| critical-health | double | 0.15 | 0.05 - 0.5 | Health % for critical retreat |
 
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `bhop` | bool | - | true | Enable bunny hop |
-| `bhopcooldown` | int | 5-30 | 12 | Ticks between bhop jumps |
-| `jumpboost` | double | 0.0-0.5 | 0.0 | Extra jump height |
-| `idle` | bool | - | true | Wander when no target |
-| `idleradius` | double | 3-50 | 10 | Idle wander radius |
+## Shield Settings
 
----
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| shield-hold-ticks | int | 60 | 10 - 200 | Ticks to hold shield raised |
+| shield-raise-ticks | int | 12 | 2 - 40 | Ticks to raise shield |
+| shield-break-chance | int | 40 | 0 - 100 | % chance to break enemy shield per hit |
 
-## 🛡️ Equipment Settings
+## Navigation Settings
 
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `autoarmor` | bool | - | true | Auto-equip best armor |
-| `autoweapon` | bool | - | true | Auto-equip best weapon |
-| `autototem` | bool | - | true | Auto-equip totem in offhand |
-| `totempriority` | bool | - | true | Prioritize totem over shield |
-| `autoshield` | bool | - | true | Auto-use shield when blocking |
-| `automend` | bool | - | true | Auto-repair armor with XP bottles |
-| `menddurability` | double | 0.1-1.0 | 0.5 | Durability % threshold to repair (50%) |
-| `prefersword` | bool | - | true | Prefer sword over axe |
-| `shieldbreak` | bool | - | true | Switch to axe to break enemy shield |
-| `droparmor` | bool | - | false | Drop worse armor pieces |
-| `dropweapon` | bool | - | false | Drop worse weapons |
-| `dropdistance` | double | 1-10 | 3.0 | Item pickup distance |
-| `interval` | int | 1-100 | 20 | Equipment check interval (ticks) |
-| `minarmorlevel` | int | 0-100 | 0 | Minimum armor level to equip |
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| bhop | bool | true | - | Enable bunny hopping |
+| idle | bool | false | - | Idle wandering when no target |
+| idle-radius | double | 10.0 | 3.0 - 50.0 | Idle wander radius |
 
-### Armor Levels
-| Level | Armor Type |
-|-------|------------|
-| 0 | Any armor |
-| 20 | Leather+ |
-| 40 | Gold+ |
-| 50 | Chain+ |
-| 60 | Iron+ |
-| 80 | Diamond+ |
-| 100 | Netherite only |
+## Faction Settings
 
----
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| factions | bool | true | - | Enable faction system |
+| friendly-fire | bool | false | - | Allow attacking allies |
 
-## 🎭 Realism Settings
+## Misc Settings
 
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `misschance` | int | 0-100 | 10 | Chance to miss attacks (%) |
-| `mistakechance` | int | 0-100 | 5 | Chance to attack wrong direction (%) |
-| `reactiondelay` | int | 0-20 | 0 | Delay before reacting (ticks) |
-
----
-
-## 👥 Other Settings
-
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `factions` | bool | - | true | Enable faction system |
-| `friendlyfire` | bool | - | false | Allow damage to faction allies |
-| `specialnames` | bool | - | false | Use special names from database |
-| `gotousebaritone` | bool | - | false | Use Baritone for goto commands |
-
----
-
-## 🚀 ElytraMace Settings
-
-| Setting | Type | Range | Default | Description |
-|---------|------|-------|---------|-------------|
-| `elytramace` | bool | - | true | Enable ElytraMace trick |
-| `elytramaceretries` | int | 1-10 | 1 | Max takeoff retry attempts |
-| `elytramacealtitude` | int | 5-50 | 20 | Minimum altitude for attack |
-| `elytramacedistance` | double | 3-15 | 8.0 | Attack distance from target |
-| `elytramacefireworks` | int | 1-10 | 3 | Number of fireworks to use |
-
-**ElytraMace Trick:** Bot equips elytra, uses fireworks to fly up, removes elytra mid-air, and attacks with mace for massive fall damage.
-
----
-
-## 💾 Configuration Files
-
-Settings are saved in:
-```
-config/pvp_bot.json
-```
-
-Bot data (positions, dimensions, gamemodes) is saved in:
-```
-config/pvp_bot_bots.json
-```
-
-Both settings and bots persist across server restarts. Bots are automatically restored when the server starts.
-
----
-
-## 📋 Examples
-
-### Make bots more realistic
-```mcfunction
-/pvpbot settings misschance 15
-/pvpbot settings mistakechance 10
-/pvpbot settings reactiondelay 5
-```
-
-### Make bots aggressive
-```mcfunction
-/pvpbot settings autotarget true
-/pvpbot settings targetplayers true
-/pvpbot settings targetbots true
-/pvpbot settings revenge true
-```
-
-### Disable ranged combat
-```mcfunction
-/pvpbot settings ranged false
-/pvpbot settings mace false
-/pvpbot settings crystalpvp false
-/pvpbot settings anchorpvp false
-```
-
-### Fast movement
-```mcfunction
-/pvpbot settings bhop true
-/pvpbot settings bhopcooldown 8
-/pvpbot settings jumpboost 0.2
-/pvpbot settings movespeed 1.5
-```
-
-### Stationary guards
-```mcfunction
-/pvpbot settings idle false
-/pvpbot settings bhop false
-```
-
-### Enable ElytraMace trick
-```mcfunction
-/pvpbot settings elytramace true
-/pvpbot settings elytramacealtitude 25
-/pvpbot settings elytramaceretries 2
-```
-
-### Enable movement commands with Baritone
-```mcfunction
-/pvpbot settings gotousebaritone true
-```
-
-### Enable special names
-```mcfunction
-/pvpbot settings specialnames true
-```
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| bot-leave-on-death | bool | true | - | Remove bot on death |
+| attack-invincible | bool | false | - | Attack in creative/spectator |
+| bots-relogs | bool | true | - | Restore bots on server restart |

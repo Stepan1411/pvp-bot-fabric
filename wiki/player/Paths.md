@@ -1,292 +1,80 @@
-# 🛤️ Path System
+# Path System
 
-The Path System allows you to create predefined routes for bots to follow. Bots can patrol areas, move between locations, and optionally engage in combat while following paths.
+Create waypoint paths for bots to follow. Paths are saved per-world in `config/pvpbot/worlds/<worldname>/paths.json`.
 
----
+## Commands
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Creating Paths](#creating-paths)
-- [Managing Waypoints](#managing-waypoints)
-- [Bot Control](#bot-control)
-- [Path Settings](#path-settings)
-- [Visualization](#visualization)
-- [Examples](#examples)
-
----
-
-## 🎯 Overview
-
-Paths are sequences of waypoints that bots can follow. Each path has:
-- **Name** - Unique identifier
-- **Waypoints** - List of positions (x, y, z)
-- **Loop Mode** - How the bot moves through waypoints
-- **Attack Mode** - Whether bot stops for combat
-- **Visualization** - Particle effects showing the path
-
-Paths are saved per-world in `config/pvpbot/worlds/{world}/paths.json`
-
----
-
-## 🆕 Creating Paths
-
-### Create a new path
+### Creating Paths
 ```
-/pvpbot path create <name>
-```
-Creates an empty path with the given name.
-
-**Example:**
-```
-/pvpbot path create patrol_route
+/pvpbot bot-management path create MyPath
 ```
 
-### Delete a path
+### Adding Waypoints
+Stand at the desired location and run:
 ```
-/pvpbot path delete <name>
+/pvpbot bot-management path add-point MyPath
 ```
-Removes the path and stops all bots following it.
+Path visualization (particles) is automatically enabled.
 
-**Example:**
+### Managing Waypoints
 ```
-/pvpbot path delete patrol_route
-```
-
-### List all paths
-```
-/pvpbot path list
-```
-Shows all available paths in the current world.
-
-### View path details
-```
-/pvpbot path info <name>
-```
-Displays path information:
-- Number of waypoints
-- Loop mode status
-- Attack mode status
-- List of all waypoint coordinates
-
-**Example:**
-```
-/pvpbot path info patrol_route
+/pvpbot bot-management path remove-point MyPath      # Remove last
+/pvpbot bot-management path remove-point MyPath 0    # Remove by index
+/pvpbot bot-management path clear MyPath             # Clear all points
+/pvpbot bot-management path info MyPath              # List all points
+/pvpbot bot-management path list                     # List all paths
 ```
 
----
-
-## 📍 Managing Waypoints
-
-### Add waypoint
+### Following Paths
 ```
-/pvpbot path add <name>
-```
-Adds your current position as a new waypoint to the path.
-
-**Example:**
-```
-/pvpbot path add patrol_route
-```
-Stand at each location you want the bot to visit and run this command.
-
-### Remove waypoint
-```
-/pvpbot path remove <name> <index>
-```
-Removes a specific waypoint by its index (starting from 0).
-
-**Example:**
-```
-/pvpbot path remove patrol_route 2
-```
-Removes the 3rd waypoint from the path.
-
-### Clear all waypoints
-```
-/pvpbot path clear <name>
-```
-Removes all waypoints from the path (keeps the path itself).
-
-**Example:**
-```
-/pvpbot path clear patrol_route
+/pvpbot bot-management path start Bot1 MyPath
+/pvpbot bot-management path stop Bot1
+/pvpbot bot-management path start-near MyPath 20     # Start for bots within 20 blocks
+/pvpbot bot-management path stop-all MyPath          # Stop all bots on path
 ```
 
----
-
-## 🤖 Bot Control
-
-### Start following path
+### Distribution
+Evenly space bots along path points:
 ```
-/pvpbot path follow <bot> <path>
-```
-Makes a bot start following the specified path.
-
-**Example:**
-```
-/pvpbot path follow Guard1 patrol_route
+/pvpbot bot-management path distribute MyPath
 ```
 
-### Stop following path
+### Walk Types
 ```
-/pvpbot path stop <bot>
+/pvpbot bot-management path walk-type MyPath bhop    # Bunny hop (default)
+/pvpbot bot-management path walk-type MyPath sprint  # Sprint
+/pvpbot bot-management path walk-type MyPath walk    # Walk
 ```
-Stops the bot from following its current path.
-
-**Example:**
-```
-/pvpbot path stop Guard1
-```
-
----
-
-## ⚙️ Path Settings
 
 ### Loop Mode
 ```
-/pvpbot path loop <name> <true/false>
+/pvpbot bot-management path loop MyPath true
+/pvpbot bot-management path loop MyPath false
 ```
 
-Controls how the bot moves through waypoints:
-- **false** (default) - Circular: 1→2→3→1→2→3...
-- **true** - Back-and-forth: 1→2→3→2→1→2→3...
+In loop mode, bots reverse direction at the end (ping-pong). In non-loop mode, bots restart from the beginning.
 
-**Example:**
+### Visualization
 ```
-/pvpbot path loop patrol_route true
-```
-
-### Attack Mode
-```
-/pvpbot path attack <name> <true/false>
+/pvpbot bot-management path show MyPath true
+/pvpbot bot-management path show MyPath false
 ```
 
-Controls combat behavior while following path:
-- **true** (default) - Bot stops at current waypoint to fight, then continues
-- **false** - Bot ignores combat and keeps moving (BotCombat disabled)
+Shows path waypoints as particles (WAX_ON + green dust lines).
 
-**Example:**
+## Faction Paths
+
+Control all bots in a faction at once:
 ```
-/pvpbot path attack patrol_route false
-```
-
----
-
-## 👁️ Visualization
-
-### Toggle path display
-```
-/pvpbot path show <name> <true/false>
+/pvpbot faction path start RedFaction MyPath
+/pvpbot faction path stop RedFaction
 ```
 
-Shows/hides particle effects for the path:
-- **Waypoints** - Wax particles at each point
-- **Lines** - Green dust particles connecting points
+## Properties
 
-Visualization automatically enables when:
-- Creating a path
-- Adding a waypoint
-- Starting to follow a path
-
-**Example:**
-```
-/pvpbot path show patrol_route true
-```
-
-To disable visualization:
-```
-/pvpbot path show patrol_route false
-```
-
----
-
-## 💡 Examples
-
-### Basic patrol route
-```
-# Create path
-/pvpbot path create base_patrol
-
-# Add waypoints (stand at each location)
-/pvpbot path add base_patrol  # Point 1
-/pvpbot path add base_patrol  # Point 2
-/pvpbot path add base_patrol  # Point 3
-/pvpbot path add base_patrol  # Point 4
-
-# Make bot follow
-/pvpbot path follow Guard1 base_patrol
-```
-
-### Guard with combat
-```
-# Create path
-/pvpbot path create guard_post
-
-# Add waypoints
-/pvpbot path add guard_post  # Position 1
-/pvpbot path add guard_post  # Position 2
-
-# Enable back-and-forth movement
-/pvpbot path loop guard_post true
-
-# Enable combat (default, but explicit)
-/pvpbot path attack guard_post true
-
-# Assign bot
-/pvpbot path follow Guard1 guard_post
-```
-
-### Peaceful courier
-```
-# Create path
-/pvpbot path create delivery_route
-
-# Add waypoints
-/pvpbot path add delivery_route  # Start
-/pvpbot path add delivery_route  # Checkpoint 1
-/pvpbot path add delivery_route  # Checkpoint 2
-/pvpbot path add delivery_route  # End
-
-# Disable combat (bot won't fight)
-/pvpbot path attack delivery_route false
-
-# Assign bot
-/pvpbot path follow Courier1 delivery_route
-```
-
-### Multiple bots on same path
-```
-# Create path
-/pvpbot path create wall_patrol
-
-# Add waypoints
-/pvpbot path add wall_patrol  # Corner 1
-/pvpbot path add wall_patrol  # Corner 2
-/pvpbot path add wall_patrol  # Corner 3
-/pvpbot path add wall_patrol  # Corner 4
-
-# Assign multiple bots
-/pvpbot path follow Guard1 wall_patrol
-/pvpbot path follow Guard2 wall_patrol
-/pvpbot path follow Guard3 wall_patrol
-```
-
----
-
-## 📝 Notes
-
-- Paths are saved automatically when modified
-- Each world has its own set of paths
-- Bots look at the next waypoint while moving
-- When attack mode is true, bots return to the waypoint they were heading to after combat
-- Path visualization is visible to all players
-- Bots reach a waypoint when within 1.5 blocks of it
-
----
-
-## 🔗 Related Pages
-
-- [Commands](Commands.md) - All available commands
-- [Navigation](Navigation.md) - Bot movement settings
-- [Combat](Combat.md) - Combat system details
+| Property | Options | Default |
+|----------|---------|---------|
+| Walk Type | bhop / sprint / walk | bhop |
+| Loop | true / false | false |
+| Attack | true / false | true |
+| Points | variable (Vec3d) | - |

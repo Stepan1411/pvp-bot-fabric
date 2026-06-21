@@ -1,145 +1,40 @@
-# 🎒 Kit System
+# Kits
 
-Save equipment presets and quickly equip bots!
+Save and load equipment presets for bots. Kits are saved globally in `config/pvpbot/kits.json`.
 
----
+## Creating Kits
 
-## 📖 Overview
+1. Equip your character with the desired items
+2. Run the create command:
 
-Kits allow you to:
-- Save your current inventory as a template
-- Quickly give equipment to bots
-- Equip entire factions at once
-
----
-
-## 📦 Creating Kits
-
-1. Put items in your inventory (armor, weapons, food, etc.)
-2. Run the create command
-
-```mcfunction
-/pvpbot createkit <name>
+```
+/pvpbot kit create-kit warrior
+/pvpbot kit create-kit archer
 ```
 
-### What Gets Saved
-- ✅ Hotbar items (slots 0-8)
-- ✅ Inventory items
-- ✅ Armor pieces
-- ✅ Offhand item
-- ✅ Item enchantments
-- ✅ Item durability
-- ✅ Stack sizes
+Kits save all 41 inventory slots (hotbar, main inventory, armor, offhand) as NBT data.
 
-### Example
-```mcfunction
-# Put diamond armor, sword, bow, arrows, golden apples in your inventory
-# Then save it:
-/pvpbot createkit pvp_warrior
+## Applying Kits
+
+### To a single bot or player
+```
+/pvpbot kit give-kit Bot1 warrior
 ```
 
----
-
-## 📋 Managing Kits
-
-### List Kits
-```mcfunction
-/pvpbot kits
+### To an entire faction
+```
+/pvpbot faction give-kit Red warrior
 ```
 
-### Delete Kit
-```mcfunction
-/pvpbot deletekit pvp_warrior
+## Managing Kits
+```
+/pvpbot kit kits                  # List all kits
+/pvpbot kit delete-kit warrior    # Delete a kit
 ```
 
----
+## Notes
 
-## 🎁 Giving Kits
-
-### To Single Bot
-```mcfunction
-/pvpbot givekit Bot1 pvp_warrior
-```
-
-### To Entire Faction
-```mcfunction
-/pvpbot faction givekit RedTeam pvp_warrior
-```
-
----
-
-## 💡 Kit Ideas
-
-### ⚔️ Melee Fighter
-- Diamond/Netherite sword
-- Full diamond armor
-- Shield
-- Golden apples
-- Totem of undying (offhand)
-
-### 🏹 Archer
-- Bow (Power V, Infinity)
-- Arrow (1 stack)
-- Leather/Chain armor
-- Golden apples
-
-### 🔨 Tank
-- Netherite armor (Protection IV)
-- Shield
-- Axe (for shield breaking)
-- Lots of golden apples
-- Multiple totems
-
-### 💨 Speed Fighter
-- Light armor (leather/chain)
-- Diamond sword (Sharpness V)
-- Speed potions
-- Golden apples
-
----
-
-## 📋 Complete Example
-
-```mcfunction
-# Step 1: Prepare your inventory with items you want
-
-# Step 2: Create the kit
-/pvpbot createkit soldier
-
-# Step 3: Spawn bots
-/pvpbot spawn Soldier1
-/pvpbot spawn Soldier2
-/pvpbot spawn Soldier3
-
-# Step 4: Give kit to all bots
-/pvpbot givekit Soldier1 soldier
-/pvpbot givekit Soldier2 soldier
-/pvpbot givekit Soldier3 soldier
-
-# Or create a faction and give kit to all at once:
-/pvpbot faction create Army
-/pvpbot faction add Army Soldier1
-/pvpbot faction add Army Soldier2
-/pvpbot faction add Army Soldier3
-/pvpbot faction givekit Army soldier
-```
-
----
-
-## 💾 Data Storage
-
-Kit data is saved in:
-```
-config/pvp_bot_kits.json
-```
-
-Kits persist across server restarts.
-
----
-
-## ⚠️ Notes
-
-- Bots will auto-equip armor from the kit
-- Bots will auto-select best weapon
-- Existing items in bot inventory are NOT cleared
-- If bot inventory is full, some items may not be given
+- Kits completely clear the target's inventory before applying
+- Kit names are case-insensitive
+- Kits are global (shared across all worlds)
+- Supported items include any Minecraft item with full NBT data (enchantments, damage, etc.)

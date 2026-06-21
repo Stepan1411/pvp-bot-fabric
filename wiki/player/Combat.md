@@ -1,185 +1,76 @@
-# ⚔️ Combat System
+# Combat System
 
-PVP Bot features an advanced combat AI that can use different weapons and tactics.
+The combat AI automatically manages target selection, weapon switching, and tactical decisions.
 
----
+## Weapon Modes
 
-## 🗡️ Weapon Types
+Bots automatically select the best weapon mode based on distance and available items:
 
-### Melee Combat
-- **Swords** - Fast attacks, good damage
-- **Axes** - Slower but can break shields
-- Bots automatically switch to melee when enemies are close
+| Mode | Weapon | Range | Conditions |
+|------|--------|-------|------------|
+| MELEE | Sword / Axe | `melee-range` (default 3.5) | Default mode |
+| RANGED | Bow / Crossbow | `ranged-min-range` - `ranged-optimal-range` | Requires arrows |
+| MACE | Mace | `mace-range` (default 6.0) | `mace` setting enabled |
+| SPEAR | Spear | `spear-range` / `spear-charge-range` | `spear` setting enabled |
+| CRYSTAL | Crystal PVP | 2.5 - 8.0 | See [Explosive Combat](ExplosiveCombat) |
+| ANCHOR | Anchor PVP | 2.0 - 8.0 | See [Explosive Combat](ExplosiveCombat) |
 
-### Ranged Combat
-- **Bows** - Draw and release arrows
-- **Crossbows** - Load and fire bolts
-- Bots keep optimal distance (8-20 blocks)
+## Target Selection
 
-### Mace Combat
-- **Mace + Wind Charge** - Jump attacks for massive damage
-- Bots use wind charges to launch into the air
-- Devastating falling attacks
+Target priority (evaluated each tick):
 
-### ElytraMace Combat
-- **Elytra + Mace + Fireworks** - Advanced aerial attack technique
-- Bots equip elytra, use fireworks to gain altitude
-- Remove elytra mid-air and attack with mace for massive fall damage
-- Highest priority weapon selection when available
-- Configurable altitude, distance, and retry settings
+1. **Forced Target** - Set via `/pvpbot bot-management attack`
+2. **Revenge** - Auto-attacks last damager (30s timeout)
+3. **Faction Enemies** - Hostile faction members (if factions enabled)
+4. **Auto Target** - Nearest valid enemy in range
 
-### Crystal PVP
-- **End Crystals + Obsidian** - Place obsidian and detonate crystals
-- Bots calculate safe explosion distances
-- Automatic crystal placement and detonation
-- High damage explosive combat
+Valid targets can include players, hostile mobs, and other bots (configurable via settings).
 
-### Anchor PVP
-- **Respawn Anchor + Glowstone** - Explosive weapon in Overworld/End
-- Bots charge anchors with glowstone
-- Detonate for massive damage
-- Only works outside the Nether
+## Combat Features
 
----
+### Critical Hits
+Bots jump before attacking to land critical hits when `criticals` is enabled.
 
-## 🎯 Targeting
-
-### Revenge Mode
-When a bot takes damage, it automatically targets the attacker.
-```mcfunction
-/pvpbot settings revenge true
-```
-
-### Auto-Target
-Bots automatically search for enemies within view distance.
-```mcfunction
-/pvpbot settings autotarget true
-```
-
-### Manual Target
-Force a bot to attack a specific target.
-```mcfunction
-/pvpbot attack BotName TargetName
-```
-
-### Target Filters
-Choose what bots can target:
-```mcfunction
-/pvpbot settings targetplayers true   # Target players
-/pvpbot settings targetmobs true      # Target hostile mobs
-/pvpbot settings targetbots true      # Target other bots
-```
-
----
-
-## 🛡️ Defense
-
-### Auto-Shield
-Bots automatically raise shields when enemies attack.
-```mcfunction
-/pvpbot settings autoshield true
-```
+### Shield Management
+- Predicts enemy attacks based on sprint direction and distance
+- Raises shield preemptively using prediction system
+- Low health triggers shield holding
+- Shield flickering for unpredictability
 
 ### Shield Breaking
-Bots use axes to disable enemy shields.
-```mcfunction
-/pvpbot settings shieldbreak true
-```
+When an enemy blocks, bots axe-shield-break them with configurable chance.
 
-### Auto-Totem
-Bots keep totems of undying in offhand.
-```mcfunction
-/pvpbot settings autototem true
-/pvpbot settings totempriority true  # Prioritize totem over shield
-```
+### Enemy Attack Prediction
+Tracks enemy position changes, sprint state, and distance to predict attack timing for shield raising.
 
-### Auto-Mend
-Bots automatically repair damaged armor using XP bottles.
-```mcfunction
-/pvpbot settings automend true
-/pvpbot settings menddurability 0.5  # Repair at 50% durability
-```
+### Retreat Logic
+When health drops below `retreat-health-percent`:
+- Raises shield and moves away
+- Uses healing potions if available
+- Places cobwebs to slow pursuit
+- Eats food to regenerate
 
----
+### Mace Defense
+Detects enemies using mace (in air, falling) and preemptively raises shield — compensates for the vanilla shield bug.
 
-## 🍎 Healing
+### Cobweb Placement
+Bots can place cobwebs on targets to immobilize them (uses items from inventory).
 
-### Auto-Eat
-Bots eat food when:
-- Health is low (< 30%)
-- Hunger is below threshold
+## Settings Reference
 
-```mcfunction
-/pvpbot settings autoeat true
-/pvpbot settings minhunger 14
-```
-
-### Auto-Potions
-Bots automatically use potions:
-- **Healing potions** - when HP is low (splash or drinkable)
-- **Strength potions** - when entering combat
-- **Speed potions** - when entering combat
-- **Fire resistance potions** - when entering combat
-
-All buff potions are thrown at once when combat starts. Bots re-apply buffs when effects expire (< 5 seconds remaining).
-
-```mcfunction
-/pvpbot settings autopotion true
-```
-
-### Retreat
-When health is low, bots retreat while eating/healing.
-Retreat is disabled if bot has no food (fights to the death).
-
-```mcfunction
-/pvpbot settings retreat true
-/pvpbot settings retreathp 0.3  # 30% HP
-```
-
----
-
-## 💥 Critical Hits
-
-Bots can perform critical hits by timing their attacks with jumps.
-```mcfunction
-/pvpbot settings criticals true
-```
-
----
-
-## 🕸️ Cobweb Tactics
-
-Bots can use cobwebs strategically:
-- **When retreating** - places cobweb under chasing enemy to slow them down
-- **In melee combat** - places cobweb under charging enemy
-
-```mcfunction
-/pvpbot settings cobweb true
-```
-
----
-
-## ⚙️ Combat Settings
-
-| Setting | Range | Default | Description |
-|---------|-------|---------|-------------|
-| `combat` | true/false | true | Enable combat |
-| `revenge` | true/false | true | Attack who attacked you |
-| `autotarget` | true/false | false | Auto-find enemies |
-| `criticals` | true/false | true | Critical hits |
-| `ranged` | true/false | true | Use bows |
-| `mace` | true/false | true | Use mace |
-| `spear` | true/false | false | Use spear (buggy) |
-| `crystalpvp` | true/false | false | Use crystal PVP |
-| `anchorpvp` | true/false | false | Use anchor PVP |
-| `elytramace` | true/false | true | Use ElytraMace trick |
-| `autopotion` | true/false | true | Auto-use potions |
-| `automend` | true/false | true | Auto-repair armor |
-| `menddurability` | 0.1-1.0 | 0.5 | Durability % to repair |
-| `totempriority` | true/false | true | Totem over shield |
-| `cobweb` | true/false | true | Use cobwebs |
-| `retreat` | true/false | true | Retreat when low HP |
-| `retreathp` | 0.1-0.9 | 0.3 | HP % to retreat |
-| `attackcooldown` | 1-40 | 10 | Ticks between attacks |
-| `meleerange` | 2-6 | 3.5 | Melee attack distance |
-| `viewdistance` | 5-128 | 64 | Target search range |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| combat | true | Enable/disable combat entirely |
+| revenge | true | Auto-engage last attacker |
+| auto-target | false | Auto-acquire nearest target |
+| target-players | true | Target real players |
+| target-mobs | false | Target hostile mobs |
+| target-bots | false | Target other bots |
+| criticals | true | Use jumping critical hits |
+| attack-cooldown | 10 | Ticks between attacks |
+| melee-range | 3.5 | Melee attack range |
+| miss-chance | 0% | Chance to miss attacks |
+| mistake-chance | 0% | Chance to make aiming mistakes |
+| attack-invincible | false | Attack creative/spectator players |
+| aim-speed | 60 | Rotation speed (degrees/sec) |
+| view-distance | 64 | Max target acquisition range |

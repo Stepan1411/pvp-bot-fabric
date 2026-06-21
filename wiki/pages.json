@@ -14,7 +14,7 @@
       }
     },
     {
-      "id": "commands",
+      "id": "Commands",
       "icon": "🎮",
       "file": "Commands.md",
       "translations": {
@@ -27,47 +27,21 @@
       }
     },
     {
-      "id": "combat",
+      "id": "Combat",
       "icon": "⚔️",
       "file": "Combat.md",
       "translations": {
-        "en": "Combat",
-        "ru": "Бой",
-        "zh": "战斗",
-        "fr": "Combat",
-        "es": "combatir",
-        "de": "Kampf"
+        "en": "Combat System",
+        "ru": "Система боя",
+        "zh": "战斗系统",
+        "fr": "Système de combat",
+        "es": "Sistema de combate",
+        "de": "Kampfsystem"
       }
     },
     {
-      "id": "factions",
-      "icon": "👥",
-      "file": "Factions.md",
-      "translations": {
-        "en": "Factions",
-        "ru": "Фракции",
-        "zh": "派系",
-        "fr": "Factions",
-        "es": "Facciones",
-        "de": "Fraktionen"
-      }
-    },
-    {
-      "id": "kits",
-      "icon": "🎒",
-      "file": "Kits.md",
-      "translations": {
-        "en": "Kits",
-        "ru": "Киты",
-        "zh": "套件",
-        "fr": "Kits",
-        "es": "Kits",
-        "de": "Bausätze"
-      }
-    },
-    {
-      "id": "navigation",
-      "icon": "🚶",
+      "id": "Navigation",
+      "icon": "🧭",
       "file": "Navigation.md",
       "translations": {
         "en": "Navigation",
@@ -79,29 +53,42 @@
       }
     },
     {
-      "id": "movement",
-      "icon": "🏃",
-      "file": "Movement.md",
-      "translations": {
-        "en": "Movement",
-        "ru": "Движение",
-        "zh": "移动",
-        "fr": "Mouvement",
-        "es": "Movimiento",
-        "de": "Bewegung"
-      }
-    },
-    {
-      "id": "paths",
-      "icon": "🛤",
+      "id": "Paths",
+      "icon": "🛤️",
       "file": "Paths.md",
       "translations": {
         "en": "Paths",
-        "ru": "Путь",
+        "ru": "Пути",
         "zh": "路径",
         "fr": "Chemins",
-        "es": "Caminos",
-        "de": "Wege"
+        "es": "Rutas",
+        "de": "Pfade"
+      }
+    },
+    {
+      "id": "Factions",
+      "icon": "👥",
+      "file": "Factions.md",
+      "translations": {
+        "en": "Factions",
+        "ru": "Фракции",
+        "zh": "派系",
+        "fr": "Factions",
+        "es": "Facciónes",
+        "de": "Fraktionen"
+      }
+    },
+    {
+      "id": "Kits",
+      "icon": "🎒",
+      "file": "Kits.md",
+      "translations": {
+        "en": "Kits",
+        "ru": "Наборы",
+        "zh": "装备组",
+        "fr": "Kits",
+        "es": "Kits",
+        "de": "Kits"
       }
     },
     {

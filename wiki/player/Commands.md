@@ -1,272 +1,86 @@
-# 🎮 Commands
+# Commands
 
-All PVP Bot commands start with `/pvpbot`. Requires permission level 2 (operator).
+All commands use the `/pvpbot` prefix.
 
----
-
-## 📋 Table of Contents
-
-- [Bot Management](#-bot-management)
-- [Combat Commands](#-combat-commands)
-- [Faction Commands](#-faction-commands)
-- [Kit Commands](#-kit-commands)
-- [Path Commands](#-path-commands)
-- [Settings](#-settings)
-
----
-
-## 🤖 Bot Management
+## Bot Management
 
 | Command | Description |
 |---------|-------------|
-| `/pvpbot spawn [name]` | Create a new bot (random name if not specified) |
-| `/pvpbot massspawn <count>` | Spawn multiple bots with random names (1-50) |
-| `/pvpbot remove <name>` | Remove a bot |
+| `/pvpbot spawn [name]` | Spawn a bot (random name if omitted) |
+| `/pvpbot remove <name>` | Remove a specific bot |
 | `/pvpbot removeall` | Remove all bots |
-| `/pvpbot list` | List all active bots |
-| `/pvpbot menu` | Open GUI menu |
-| `/pvpbot inventory <name>` | Show bot's inventory |
+| `/pvpbot reload` | Reload all configurations (settings, kits, paths, bots) |
+| `/pvpbot bot-management list` | List all active bots |
+| `/pvpbot bot-management inventory <botname>` | View bot inventory and stats |
+| `/pvpbot bot-management mass-spawn <1-50>` | Spawn multiple bots |
 
-### Examples
-
-```mcfunction
-# Create a bot with random name
-/pvpbot spawn
-
-# Create a bot named "Guard1"
-/pvpbot spawn Guard1
-
-# Spawn 10 bots with random names (10% chance for special names)
-/pvpbot massspawn 10
-
-# Remove the bot
-/pvpbot remove Guard1
-
-# See all bots
-/pvpbot list
-```
-
-**Note:** When spawning bots with random names, there's a 10% chance they will get a special name (`nantag` or `Stepan1411`) instead of a generated name.
-
----
-
-## ⚔️ Combat Commands
+## Combat Control
 
 | Command | Description |
 |---------|-------------|
-| `/pvpbot attack <bot> <target>` | Order bot to attack a player/entity |
-| `/pvpbot stop <bot>` | Stop bot from attacking |
-| `/pvpbot target <bot>` | Show bot's current target |
+| `/pvpbot bot-management attack <botname> <target>` | Force bot to attack a target |
+| `/pvpbot bot-management stop-attack <botname>` | Stop attacking |
 
----
-
-## 🚶 Movement Commands
+## Settings
 
 | Command | Description |
 |---------|-------------|
-| `/pvpbot follow <bot> <target>` | Make bot follow a player/bot |
-| `/pvpbot escort <bot> <target>` | Make bot follow and protect a target |
-| `/pvpbot goto <bot> <x> <y> <z>` | Move bot to specific coordinates |
-| `/pvpbot stopmovement <bot>` | Stop bot movement |
+| `/pvpbot settings` | List all current settings |
+| `/pvpbot settings <name>` | View a specific setting |
+| `/pvpbot settings <name> <value>` | Set a setting value |
 
-### Movement Examples
+See [Settings](Settings) for all available options.
 
-```mcfunction
-# Make Bot1 follow player Steve
-/pvpbot follow Bot1 Steve
-
-# Make Bot2 escort (follow + protect) player Alex
-/pvpbot escort Bot2 Alex
-
-# Send Bot3 to coordinates 100 64 200
-/pvpbot goto Bot3 100 64 200
-
-# Stop Bot1 from moving
-/pvpbot stopmovement Bot1
-```
-
-**Note:** 
-- **Follow**: Bot maintains 3-block distance from target
-- **Escort**: Same as follow, but bot will defend target if attacked
-- **Goto**: Bot moves to coordinates using smart pathfinding (Baritone if enabled)
-
-### Examples
-
-```mcfunction
-# Make Bot1 attack player Steve
-/pvpbot attack Bot1 Steve
-
-# Stop the attack
-/pvpbot stop Bot1
-
-# Check who Bot1 is targeting
-/pvpbot target Bot1
-```
-
----
-
-## 👥 Faction Commands
+## Paths
 
 | Command | Description |
 |---------|-------------|
-| `/pvpbot faction create <name>` | Create a new faction |
+| `/pvpbot bot-management path create <name>` | Create a new path |
+| `/pvpbot bot-management path delete <name>` | Delete a path |
+| `/pvpbot bot-management path add-point <name>` | Add current position as waypoint |
+| `/pvpbot bot-management path remove-point <name> [index]` | Remove point (last or by index) |
+| `/pvpbot bot-management path clear <name>` | Clear all points |
+| `/pvpbot bot-management path loop <name> <true/false>` | Toggle looping |
+| `/pvpbot bot-management path start <bot> <path>` | Start bot following path |
+| `/pvpbot bot-management path stop <bot>` | Stop bot following path |
+| `/pvpbot bot-management path list` | List all paths |
+| `/pvpbot bot-management path show <name> <true/false>` | Toggle path visualization |
+| `/pvpbot bot-management path info <name>` | View path details |
+| `/pvpbot bot-management path distribute <path>` | Spread bots evenly along path |
+| `/pvpbot bot-management path start-near <path> <radius>` | Start path for nearby bots |
+| `/pvpbot bot-management path stop-all <path>` | Stop all bots on path |
+| `/pvpbot bot-management path walk-type <name> <type>` | Set walk type (bhop/sprint/walk) |
+
+See [Paths](Paths) for detailed usage.
+
+## Kits
+
+| Command | Description |
+|---------|-------------|
+| `/pvpbot kit create-kit <name>` | Save your inventory as a kit |
+| `/pvpbot kit delete-kit <name>` | Delete a kit |
+| `/pvpbot kit give-kit <player> <kitname>` | Give kit to player/bot |
+| `/pvpbot kit kits` | List all kits |
+
+See [Kits](Kits) for detailed usage.
+
+## Factions
+
+| Command | Description |
+|---------|-------------|
+| `/pvpbot faction list` | List all factions |
+| `/pvpbot faction create <name>` | Create a faction |
 | `/pvpbot faction delete <name>` | Delete a faction |
 | `/pvpbot faction add <faction> <player>` | Add player/bot to faction |
-| `/pvpbot faction remove <faction> <player>` | Remove from faction |
-| `/pvpbot faction hostile <f1> <f2> [true/false]` | Set factions as hostile |
-| `/pvpbot faction addnear <faction> <radius>` | Add all nearby bots |
-| `/pvpbot faction give <faction> <item>` | Give item to all members |
-| `/pvpbot faction givekit <faction> <kit>` | Give kit to all members |
-| `/pvpbot faction attack <faction> <target>` | All bots in faction attack target |
-| `/pvpbot faction follow <faction> <target>` | All bots in faction follow target |
-| `/pvpbot faction escort <faction> <target>` | All bots in faction escort target |
-| `/pvpbot faction goto <faction> <x> <y> <z>` | Move all bots in faction to coordinates |
-| `/pvpbot faction startpath <faction> <path>` | Start path for all bots in faction |
-| `/pvpbot faction stoppath <faction>` | Stop path for all bots in faction |
-| `/pvpbot faction list` | List all factions |
-| `/pvpbot faction info <faction>` | Show faction details |
+| `/pvpbot faction remove <faction> <player>` | Remove player/bot from faction |
+| `/pvpbot faction hostile <f1> <f2> [true/false]` | Set hostile relations |
+| `/pvpbot faction info <name>` | View faction info |
+| `/pvpbot faction add-near <faction> <radius>` | Add nearby bots to faction |
+| `/pvpbot faction add-all <faction>` | Add all bots to faction |
+| `/pvpbot faction give <faction> <item>` | Give items to all members |
+| `/pvpbot faction attack <faction> <target>` | All members attack target |
+| `/pvpbot faction path start <faction> <path>` | All members follow path |
+| `/pvpbot faction path stop <faction>` | Stop all members on path |
+| `/pvpbot faction give-kit <faction> <kitname>` | Give kit to all members |
 
-### Examples
-
-```mcfunction
-# Create two factions
-/pvpbot faction create RedTeam
-/pvpbot faction create BlueTeam
-
-# Add bots to factions
-/pvpbot faction add RedTeam Bot1
-/pvpbot faction add BlueTeam Bot2
-
-# Make them enemies
-/pvpbot faction hostile RedTeam BlueTeam
-
-# Order entire faction to attack
-/pvpbot faction attack RedTeam Steve
-
-# Make entire faction follow a player
-/pvpbot faction follow RedTeam Alex
-
-# Make entire faction escort a player
-/pvpbot faction escort RedTeam Steve
-
-# Move entire faction to coordinates
-/pvpbot faction goto RedTeam 100 64 200
-
-# Give swords to everyone in RedTeam
-/pvpbot faction give RedTeam diamond_sword
-
-# Make entire faction patrol a path
-/pvpbot faction startpath RedTeam patrol_route
-
-# Stop faction from patrolling
-/pvpbot faction stoppath RedTeam
-```
-
----
-
-## 🎒 Kit Commands
-
-| Command | Description |
-|---------|-------------|
-| `/pvpbot createkit <name>` | Create kit from your inventory |
-| `/pvpbot deletekit <name>` | Delete a kit |
-| `/pvpbot kits` | List all kits |
-| `/pvpbot givekit <bot> <kit>` | Give kit to a bot |
-| `/pvpbot faction givekit <faction> <kit>` | Give kit to faction |
-
-### Examples
-
-```mcfunction
-# Put items in your inventory, then:
-/pvpbot createkit warrior
-
-# Give kit to a bot
-/pvpbot givekit Bot1 warrior
-
-# Give kit to entire faction
-/pvpbot faction givekit RedTeam warrior
-```
-
----
-
-## 🛤️ Path Commands
-
-| Command | Description |
-|---------|-------------|
-| `/pvpbot path create <name>` | Create a new path |
-| `/pvpbot path delete <name>` | Delete a path |
-| `/pvpbot path addpoint <name>` | Add current position as waypoint |
-| `/pvpbot path removepoint <name> [index]` | Remove waypoint (last or by index) |
-| `/pvpbot path clear <name>` | Remove all waypoints |
-| `/pvpbot path list` | List all paths |
-| `/pvpbot path info <name>` | Show path information |
-| `/pvpbot path start <bot> <path>` | Make bot follow path |
-| `/pvpbot path stop <bot>` | Stop bot from following path |
-| `/pvpbot path loop <name> <true/false>` | Toggle loop mode |
-| `/pvpbot path attack <name> <true/false>` | Toggle combat mode |
-| `/pvpbot path show <name> <true/false>` | Toggle path visualization |
-| `/pvpbot path distribute <path>` | Distribute bots evenly along path |
-| `/pvpbot path startnear <path> <radius>` | Start path for bots within radius |
-| `/pvpbot path stopall <path>` | Stop all bots on this path |
-
-### Examples
-
-```mcfunction
-# Create a patrol route
-/pvpbot path create patrol
-
-# Add waypoints (stand at each location)
-/pvpbot path addpoint patrol
-/pvpbot path addpoint patrol
-/pvpbot path addpoint patrol
-
-# Make bot follow the path
-/pvpbot path start Guard1 patrol
-
-# Enable back-and-forth movement
-/pvpbot path loop patrol true
-
-# Disable combat while patrolling
-/pvpbot path attack patrol false
-
-# Show path with particles
-/pvpbot path show patrol true
-
-# Distribute all bots on path evenly
-/pvpbot path distribute patrol
-
-# Start path for all bots within 50 blocks
-/pvpbot path startnear patrol 50
-
-# Stop all bots following this path
-/pvpbot path stopall patrol
-```
-
-See [Paths](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Paths) page for detailed guide.
-
----
-
-## ⚙️ Settings
-
-Use `/pvpbot settings` to see all current settings.
-
-Use `/pvpbot settings <setting>` to see current value.
-
-Use `/pvpbot settings <setting> <value>` to change a setting.
-
-Use `/pvpbot settings gui` to open the graphical settings menu.
-
-See [Settings](https://github.com/Stepan1411/pvp-bot-fabric/wiki/Settings) page for full list of all settings.
-
-### Quick Examples
-
-```mcfunction
-# Enable auto-targeting
-/pvpbot settings autotarget true
-
-# Set miss chance to 20%
-/pvpbot settings misschance 20
-
-# Enable bunny hop
-/pvpbot settings bhop true
-```
+See [Factions](Factions) for detailed usage.
