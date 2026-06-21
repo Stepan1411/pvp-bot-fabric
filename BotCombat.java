@@ -8,7 +8,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
 import net.minecraft.item.*;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.component.DataComponentTypes;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
@@ -86,7 +85,6 @@ public class BotCombat {
         public int totalTicks = 0;
         public double phaseStartY = 0;
         public ItemStack savedElytra = ItemStack.EMPTY;
-        public int windBurstDelay = 0;
     }
 
     private static final Map<String, ElytraMaceState> elytraMaceStates = new HashMap<>();
@@ -108,46 +106,6 @@ public class BotCombat {
         elytraMaceStates.remove(botName);
     }
 
-    // ========== WIND BURST ==========
-
-    public static class WindBurstState {
-        public String targetName;
-        public int phase = 0;
-        public int tickCounter = 0;
-    }
-
-    private static final Map<String, WindBurstState> windBurstStates = new HashMap<>();
-
-    public static boolean isWindBurstActive(String botName) {
-        return windBurstStates.containsKey(botName);
-    }
-
-    public static void startWindBurst(String botName, String targetName) {
-        WindBurstState state = new WindBurstState();
-        state.targetName = targetName;
-        state.phase = 0;
-        state.tickCounter = 0;
-        windBurstStates.put(botName, state);
-    }
-
-    private static boolean hasWindBurstMace(ServerPlayerEntity bot) {
-        for (int i = 0; i < 36; i++) {
-            ItemStack stack = bot.getInventory().getStack(i);
-            if (stack.getItem() == Items.MACE) {
-                var enchantments = stack.get(DataComponentTypes.ENCHANTMENTS);
-                if (enchantments != null) {
-                    for (var entry : enchantments.getEnchantments()) {
-                        String id = entry.getIdAsString().toLowerCase();
-                        if (id.contains("wind_burst")) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
     public static CombatState getState(String botName) {
         return combatStates.computeIfAbsent(botName, k -> new CombatState());
     }
@@ -166,24 +124,18 @@ public class BotCombat {
                 if (!elytra.isEmpty()) {
                     var inv = bot.getInventory();
                     boolean placed = false;
-                    if (inv.getStack(38).isEmpty()) {
-                        inv.setStack(38, elytra.copy());
-                        placed = true;
-                    }
-                    if (!placed) {
-                        for (int i = 0; i < 41; i++) {
-                            if (inv.getStack(i).isEmpty()) {
-                                inv.setStack(i, elytra.copy());
-                                placed = true;
-                                break;
-                            }
+                    for (int i = 0; i < 41; i++) {
+                        if (inv.getStack(i).isEmpty()) {
+                            inv.setStack(i, elytra.copy());
+                            placed = true;
+                            break;
                         }
                     }
                     if (!placed) {
                         bot.dropItem(elytra.copy(), true, true);
                     }
                 }
-                if (bot.isAlive() && !windBurstStates.containsKey(botName)) {
+                if (bot.isAlive()) {
                     CombatState st = getState(botName);
                     if (st.forcedTargetName != null) {
                         Entity t = server.getPlayerManager().getPlayer(st.forcedTargetName);
@@ -195,13 +147,7 @@ public class BotCombat {
             }
         }
 
-        // Handle Wind Burst before Elytra Mace
-        if (windBurstStates.containsKey(botName)) {
-            handleWindBurst(bot, server);
-            return;
-        }
-
-        if (!elytraMaceStates.containsKey(botName) && !pendingElytraRestore.containsKey(botName) && !windBurstStates.containsKey(botName)) {
+        if (!elytraMaceStates.containsKey(botName) && !pendingElytraRestore.containsKey(botName)) {
             CombatState st = getState(botName);
             String targetName = null;
             if (st.lastAttacker instanceof PlayerEntity && st.lastAttacker.isAlive() && System.currentTimeMillis() - st.lastAttackTime < 2000) {
@@ -1718,7 +1664,6 @@ public class BotCombat {
         state.isRetreating = false;
         elytraMaceStates.remove(botName);
         pendingElytraRestore.remove(botName);
-        windBurstStates.remove(botName);
     }
     
     
@@ -1738,7 +1683,7 @@ public class BotCombat {
         state.lastAttackTime = System.currentTimeMillis();
 
         String botName = bot.getName().getString();
-        if (!elytraMaceStates.containsKey(botName) && !pendingElytraRestore.containsKey(botName) && !windBurstStates.containsKey(botName)) {
+        if (!elytraMaceStates.containsKey(botName) && !pendingElytraRestore.containsKey(botName)) {
             if (attacker instanceof PlayerEntity && attacker.isAlive() && hasElytraMaceItems(bot)) {
                 startElytraMace(botName, attacker.getName().getString());
             }
@@ -1986,178 +1931,19 @@ public class BotCombat {
                         if (chestSlot.getItem() == Items.ELYTRA) {
                             inventory.setStack(38, ItemStack.EMPTY);
                             pendingElytraRestore.put(botName, chestSlot.copy());
-                            int maceSlot = findMace(inventory);
-                            if (maceSlot >= 0) {
-                                if (maceSlot >= 9) {
-                                    ItemStack mace = inventory.getStack(maceSlot);
-                                    ItemStack slot0 = inventory.getStack(0);
-                                    inventory.setStack(maceSlot, slot0);
-                                    inventory.setStack(0, mace);
-                                    maceSlot = 0;
-                                }
-                                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, maceSlot);
-                            }
-                            state.windBurstDelay = 0;
-                        } else {
-                            state.windBurstDelay++;
-                            if (state.windBurstDelay >= 3) {
-                                lookAtTarget(bot, targetEntity);
-                                attackWithCarpet(bot, targetEntity, server);
-                                CombatState combatState = getState(botName);
-                                combatState.forcedTargetName = state.targetName;
-                                if (hasWindBurstMace(bot)) {
-                                    startWindBurst(botName, state.targetName);
-                                }
-                                elytraMaceStates.remove(botName);
-                            }
                         }
+                        int maceSlot = findMace(inventory);
+                        if (maceSlot >= 0 && maceSlot < 9) {
+                            org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, maceSlot);
+                        }
+                        lookAtTarget(bot, targetEntity);
+                        attackWithCarpet(bot, targetEntity, server);
+                        CombatState combatState = getState(botName);
+                        combatState.forcedTargetName = state.targetName;
+                        elytraMaceStates.remove(botName);
                     }
                 } else {
                     elytraMaceStates.remove(botName);
-                }
-                break;
-            }
-        }
-    }
-
-    // ========== WIND BURST HANDLER ==========
-
-    private static void handleWindBurst(ServerPlayerEntity bot, net.minecraft.server.MinecraftServer server) {
-        String botName = bot.getName().getString();
-        WindBurstState state = windBurstStates.get(botName);
-        if (state == null) {
-            return;
-        }
-
-        net.minecraft.entity.player.PlayerInventory inventory = bot.getInventory();
-        state.tickCounter++;
-
-        if (state.tickCounter > 200) {
-            windBurstStates.remove(botName);
-            pendingElytraRestore.remove(botName);
-            return;
-        }
-
-        Entity target = server.getPlayerManager().getPlayer(state.targetName);
-        if (target == null || !target.isAlive()) {
-            windBurstStates.remove(botName);
-            return;
-        }
-
-        switch (state.phase) {
-            case 0: {
-                if (state.tickCounter >= 10) {
-                    state.phase = 1;
-                    state.tickCounter = 0;
-                }
-                break;
-            }
-            case 1: {
-                ItemStack savedElytra = pendingElytraRestore.remove(botName);
-                if (savedElytra != null && !savedElytra.isEmpty()) {
-                    inventory.setStack(38, savedElytra.copy());
-                } else {
-                    for (int i = 0; i < 41; i++) {
-                        if (inventory.getStack(i).getItem() == Items.ELYTRA) {
-                            if (i != 38) {
-                                ItemStack elytra = inventory.getStack(i);
-                                ItemStack current38 = inventory.getStack(38);
-                                inventory.setStack(i, current38);
-                                inventory.setStack(38, elytra);
-                            }
-                            break;
-                        }
-                    }
-                }
-                try {
-                    server.getCommandManager().getDispatcher().execute(
-                        "player " + botName + " jump once",
-                        server.getCommandSource()
-                    );
-                } catch (Exception ignored) {}
-                state.phase = 2;
-                state.tickCounter = 0;
-                break;
-            }
-            case 2: {
-                    if (state.tickCounter >= 1) {
-                        boolean foundFirework = false;
-                        for (int i = 0; i < 41; i++) {
-                            if (inventory.getStack(i).getItem() == Items.FIREWORK_ROCKET) {
-                                if (i != 0) {
-                                    ItemStack rocket = inventory.getStack(i);
-                                    ItemStack current = inventory.getStack(0);
-                                    inventory.setStack(i, current);
-                                    inventory.setStack(0, rocket);
-                                }
-                                org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, 0);
-                                foundFirework = true;
-                                break;
-                            }
-                        }
-                        if (!foundFirework) {
-                            windBurstStates.remove(botName);
-                            break;
-                        }
-                        lookAtTarget(bot, target);
-                        try {
-                            server.getCommandManager().getDispatcher().execute(
-                                "player " + botName + " use once",
-                                server.getCommandSource()
-                            );
-                        } catch (Exception ignored) {}
-                        state.phase = 3;
-                        state.tickCounter = 0;
-                    }
-                break;
-            }
-            case 3: {
-                double dist = bot.distanceTo(target);
-                BotNavigation.moveToward(bot, target, 1.0);
-
-                if (dist <= 6.0) {
-                    lookAtTarget(bot, target);
-                    ItemStack chestSlot = inventory.getStack(38);
-                    if (chestSlot.getItem() == Items.ELYTRA) {
-                        inventory.setStack(38, ItemStack.EMPTY);
-                        pendingElytraRestore.put(botName, chestSlot.copy());
-
-                        int maceSlot = findMace(inventory);
-                        if (maceSlot >= 0) {
-                            if (maceSlot >= 9) {
-                                ItemStack mace = inventory.getStack(maceSlot);
-                                ItemStack slot0 = inventory.getStack(0);
-                                inventory.setStack(maceSlot, slot0);
-                                inventory.setStack(0, mace);
-                                maceSlot = 0;
-                            }
-                            org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, maceSlot);
-                        }
-
-                        if (bot.fallDistance < 1.5f) {
-                            try {
-                                server.getCommandManager().getDispatcher().execute(
-                                    "player " + botName + " attack once",
-                                    server.getCommandSource()
-                                );
-                            } catch (Exception ignored) {}
-                            windBurstStates.remove(botName);
-                            break;
-                        }
-                    }
-
-                    try {
-                        server.getCommandManager().getDispatcher().execute(
-                            "player " + botName + " attack once",
-                            server.getCommandSource()
-                        );
-                    } catch (Exception ignored) {}
-                } else {
-                    BotNavigation.lookAtPosition(bot, new Vec3d(target.getX(), target.getY() + 3, target.getZ()));
-                    if (inventory.getStack(38).getItem() != Items.ELYTRA) {
-                        state.phase = 0;
-                        state.tickCounter = 0;
-                    }
                 }
                 break;
             }

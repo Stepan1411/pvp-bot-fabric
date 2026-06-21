@@ -45,8 +45,9 @@ public class BotTicker {
             if (bot != null && bot.isAlive()) {
 
                 boolean isElytraMacing = BotCombat.isElytraMaceActive(botName);
+                boolean isWindBursting = BotCombat.isWindBurstActive(botName);
 
-                if (!isElytraMacing) {
+                if (!isElytraMacing && !isWindBursting) {
                     BotUtils.update(bot, server);
                     org.stepan1411.pvp_bot.fixes.EatingMovementFix.apply(bot);
                 }
@@ -119,7 +120,7 @@ public class BotTicker {
 
                 if (tickCounter >= interval) {
                     var utilsState = BotUtils.getState(botName);
-                    if (!utilsState.isEating && !BotCombat.isElytraMaceActive(botName)) {
+                    if (!utilsState.isEating && !BotCombat.isElytraMaceActive(botName) && !BotCombat.isWindBurstActive(botName)) {
                         BotEquipment.autoEquip(bot);
                     }
                 }
