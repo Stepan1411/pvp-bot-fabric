@@ -81,6 +81,7 @@ public class BotSettings {
     private boolean arrowPredictionEnabled = true;
     private boolean rangedStrafeEnabled = true;
     private boolean rangedRetreatOnClose = true;
+    private boolean profileLagFix = true;
     
     public static final BotSettings DEFAULTS = new BotSettings();
     
@@ -202,6 +203,7 @@ public class BotSettings {
     public boolean isArrowPredictionEnabled() { return arrowPredictionEnabled; }
     public boolean isRangedStrafeEnabled() { return rangedStrafeEnabled; }
     public boolean isRangedRetreatOnClose() { return rangedRetreatOnClose; }
+    public boolean isProfileLagFix() { return profileLagFix; }
     public double getAimSpeed() { return aimSpeed; }
     
 
@@ -381,6 +383,10 @@ public class BotSettings {
     }
     public void setRangedRetreatOnClose(boolean value) {
         this.rangedRetreatOnClose = value;
+        save();
+    }
+    public void setProfileLagFix(boolean value) {
+        this.profileLagFix = value;
         save();
     }
 }

@@ -319,6 +319,7 @@ public class BotCommand {
         settings.then(boolSetting("auto-mend", "Auto-use XP for mending", () -> BotSettings.get().isAutoMendEnabled(), v -> BotSettings.get().setAutoMendEnabled(v), BotSettings.DEFAULTS::isAutoMendEnabled));
         settings.then(boolSetting("bot-leave-on-death", "Bot leaves on death", () -> BotSettings.get().isBotLeaveOnDeath(), v -> BotSettings.get().setBotLeaveOnDeath(v), BotSettings.DEFAULTS::isBotLeaveOnDeath));
         settings.then(boolSetting("attack-invincible", "Attack creative/spectator", () -> BotSettings.get().isAttackInvincible(), v -> BotSettings.get().setAttackInvincible(v), BotSettings.DEFAULTS::isAttackInvincible));
+        settings.then(boolSetting("profile-lagg-fix", "Pre-populate profile cache to prevent lag on bot spawn", () -> BotSettings.get().isProfileLagFix(), v -> BotSettings.get().setProfileLagFix(v), BotSettings.DEFAULTS::isProfileLagFix));
         settings.then(doubleSetting("aim-speed", "Aim rotation speed", () -> BotSettings.get().getAimSpeed(), v -> BotSettings.get().setAimSpeed(v), 3.0, 45.0, BotSettings.DEFAULTS::getAimSpeed));
         settings.then(doubleSetting("view-distance", "Max target acquisition range", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0, BotSettings.DEFAULTS::getMaxTargetDistance));
         settings.then(intSetting("max-mass-spawn", "Max bots per mass-spawn command", () -> BotSettings.get().getMaxMassSpawn(), v -> BotSettings.get().setMaxMassSpawn(v), 50, 10000, BotSettings.DEFAULTS::getMaxMassSpawn));

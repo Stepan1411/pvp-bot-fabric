@@ -9,6 +9,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.GameMode;
 import org.stepan1411.pvp_bot.config.WorldConfigHelper;
+import org.stepan1411.pvp_bot.fixes.ProfileLagFix;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -28,6 +29,7 @@ public class BotManager {
     private static final int MAX_NULL_TICKS = 100;
     private static Path savePath;
     private static boolean initialized = false;
+
     public static class BotData {
         public String name;
         public double x, y, z;
@@ -107,6 +109,7 @@ public class BotManager {
             var dispatcher = server.getCommandManager().getDispatcher();
             boolean success = false;
             
+            if (BotSettings.get().isProfileLagFix()) ProfileLagFix.preloadProfileCache(server, name);
             try {
                 String command = String.format(java.util.Locale.US,
                     "playerspawn %s at %.2f %.2f %.2f facing %.2f %.2f in %s on %s",
@@ -287,6 +290,7 @@ public class BotManager {
 
 
         var dispatcher = server.getCommandManager().getDispatcher();
+        if (BotSettings.get().isProfileLagFix()) ProfileLagFix.preloadProfileCache(server, name);
         try {
 
             dispatcher.execute("playerspawn " + name + " at ~ ~ ~ facing 0 0 in survival", source);
