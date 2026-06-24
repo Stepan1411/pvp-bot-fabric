@@ -1,7 +1,6 @@
 
-![MIEDTMBMBRBOG](https://cdn.modrinth.com/data/cached_images/47af968dac4bcb1e69d6ef5bfd50c13d36725f21.png)
+<img width="1920" height="1080" alt="pvpbotbanner" src="https://github.com/user-attachments/assets/c578ff0c-e801-4366-9f81-861e1f53e298" />
 
-# PVP Bot Fabric
 
 > **An advanced mod for Minecraft Fabric that adds AI bots for PvP**
 
