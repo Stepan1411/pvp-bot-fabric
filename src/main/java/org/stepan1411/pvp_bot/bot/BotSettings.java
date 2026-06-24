@@ -30,14 +30,15 @@ public class BotSettings {
     private boolean targetOtherBots = false;
     private double maxTargetDistance = 64.0;
     private double meleeRange = 3.5;
-    private double rangedMinRange = 8.0;
-    private double rangedOptimalRange = 20.0;
+    private double rangedMinRange = 20.0;
+    private double rangedOptimalRange = 40.0;
+    private double rangedMaxRange = 60.0;
     private double maceRange = 6.0;
     private int attackCooldown = 10;
     private double moveSpeed = 1.0;
     private boolean criticalsEnabled = true;
     private int criticalFallTicks = 6;
-    private int bowMinDrawTime = 15;
+    private int bowMinDrawTime = 40;
     private boolean rangedEnabled = true;
     private boolean maceEnabled = true;
     private boolean spearEnabled = false;
@@ -74,8 +75,14 @@ public class BotSettings {
     private boolean useSpecialNames = false;
     private boolean botLeaveOnDeath = true;
     private boolean attackInvincible = false;
-    private double aimSpeed = 60.0;
+    private double aimSpeed = 90.0;
     private boolean shieldMace = true;
+    private int maxMassSpawn = 1000;
+    private boolean arrowPredictionEnabled = true;
+    private boolean rangedStrafeEnabled = true;
+    private boolean rangedRetreatOnClose = true;
+    
+    public static final BotSettings DEFAULTS = new BotSettings();
     
     private BotSettings() {}
     
@@ -140,6 +147,7 @@ public class BotSettings {
     public double getMeleeRange() { return meleeRange; }
     public double getRangedMinRange() { return rangedMinRange; }
     public double getRangedOptimalRange() { return rangedOptimalRange; }
+    public double getRangedMaxRange() { return rangedMaxRange; }
     public double getMaceRange() { return maceRange; }
     public int getAttackCooldown() { return attackCooldown; }
     public double getMoveSpeed() { return moveSpeed; }
@@ -190,6 +198,10 @@ public class BotSettings {
     public boolean isBotLeaveOnDeath() { return botLeaveOnDeath; }
     public boolean isAttackInvincible() { return attackInvincible; }
     public boolean isShieldMace() { return shieldMace; }
+    public int getMaxMassSpawn() { return maxMassSpawn; }
+    public boolean isArrowPredictionEnabled() { return arrowPredictionEnabled; }
+    public boolean isRangedStrafeEnabled() { return rangedStrafeEnabled; }
+    public boolean isRangedRetreatOnClose() { return rangedRetreatOnClose; }
     public double getAimSpeed() { return aimSpeed; }
     
 
@@ -241,6 +253,10 @@ public class BotSettings {
         this.rangedOptimalRange = Math.max(10.0, Math.min(50.0, value)); 
         save(); 
     }
+    public void setRangedMaxRange(double value) { 
+        this.rangedMaxRange = Math.max(15.0, Math.min(100.0, value)); 
+        save(); 
+    }
     public void setMaceRange(double value) { 
         this.maceRange = Math.max(3.0, Math.min(10.0, value)); 
         save(); 
@@ -259,7 +275,7 @@ public class BotSettings {
         save();
     }
     public void setBowMinDrawTime(int value) { 
-        this.bowMinDrawTime = Math.max(5, Math.min(30, value)); 
+        this.bowMinDrawTime = Math.max(5, Math.min(100, value)); 
         save(); 
     }
     public void setRangedEnabled(boolean value) { this.rangedEnabled = value; save(); }
@@ -350,5 +366,21 @@ public class BotSettings {
     public void setShieldMace(boolean value) { 
         this.shieldMace = value; 
         save(); 
+    }
+    public void setMaxMassSpawn(int value) { 
+        this.maxMassSpawn = Math.max(50, Math.min(10000, value)); 
+        save(); 
+    }
+    public void setArrowPredictionEnabled(boolean value) {
+        this.arrowPredictionEnabled = value;
+        save();
+    }
+    public void setRangedStrafeEnabled(boolean value) {
+        this.rangedStrafeEnabled = value;
+        save();
+    }
+    public void setRangedRetreatOnClose(boolean value) {
+        this.rangedRetreatOnClose = value;
+        save();
     }
 }

@@ -20,7 +20,6 @@ import org.stepan1411.pvp_bot.bot.BotManager;
 import org.stepan1411.pvp_bot.bot.BotNameGenerator;
 import org.stepan1411.pvp_bot.bot.BotPath;
 import org.stepan1411.pvp_bot.bot.BotSettings;
-
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -58,8 +57,16 @@ public class BotCommand {
             return builder.buildFuture();
         };
 
+    private static LiteralArgumentBuilder<ServerCommandSource> cmd(String literal, String description) {
+        return CommandManager.literal(literal)
+            .executes(ctx -> {
+                ctx.getSource().sendFeedback(() -> Text.literal("§7[Tip] §a" + description), false);
+                return 1;
+            });
+    }
+
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(CommandManager.literal("pvpbot")
+        dispatcher.register(cmd("pvpbot", "PvP Bot control")
             .requires(s -> true)
 
             // ========== SPAWN ==========
@@ -69,7 +76,7 @@ public class BotCommand {
                     .executes(ctx -> spawn(ctx, StringArgumentType.getString(ctx, "name")))))
 
             // ========== REMOVE ==========
-            .then(CommandManager.literal("remove")
+            .then(cmd("remove", "Remove a bot")
                 .then(CommandManager.argument("name", StringArgumentType.word())
                     .suggests(BOT_SUGGESTIONS)
                     .executes(BotCommand::remove)))
@@ -84,89 +91,89 @@ public class BotCommand {
             .then(buildSettings())
 
             // ========== BOT-MANAGEMENT ==========
-            .then(CommandManager.literal("bot-management")
-                .then(CommandManager.literal("mass-spawn")
-                    .then(CommandManager.argument("count", IntegerArgumentType.integer(1, 50))
+            .then(cmd("bot-management", "Bot management")
+                .then(cmd("mass-spawn", "Mass spawn bots")
+                    .then(CommandManager.argument("count", IntegerArgumentType.integer(1, 10000))
                         .executes(BotCommand::massSpawn)))
-                .then(CommandManager.literal("attack")
+                .then(cmd("attack", "Attack a target")
                     .then(CommandManager.argument("botname", StringArgumentType.word())
                         .suggests(BOT_SUGGESTIONS)
                         .then(CommandManager.argument("target", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::botAttack))))
-                .then(CommandManager.literal("stop-attack")
+                .then(cmd("stop-attack", "Stop attack")
                     .then(CommandManager.argument("botname", StringArgumentType.word())
                         .suggests(BOT_SUGGESTIONS)
                         .executes(BotCommand::botStopAttack)))
-                .then(CommandManager.literal("inventory")
+                .then(cmd("inventory", "Show bot inventory")
                     .then(CommandManager.argument("botname", StringArgumentType.word())
                         .suggests(BOT_SUGGESTIONS)
                         .executes(BotCommand::botInventory)))
                 .then(CommandManager.literal("list")
                     .executes(BotCommand::botList))
-                .then(CommandManager.literal("path")
-                    .then(CommandManager.literal("create")
+                .then(cmd("path", "Path management")
+                    .then(cmd("create", "Create a path")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathCreate)))
-                    .then(CommandManager.literal("delete")
+                    .then(cmd("delete", "Delete a path")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathDelete)))
-                    .then(CommandManager.literal("add-point")
+                    .then(cmd("add-point", "Add point to path")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathAddPoint)))
-                    .then(CommandManager.literal("remove-point")
+                    .then(cmd("remove-point", "Remove point from path")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("index", IntegerArgumentType.integer())
                                 .executes(BotCommand::pathRemovePoint))
                             .executes(BotCommand::pathRemovePointLast)))
-                    .then(CommandManager.literal("clear")
+                    .then(cmd("clear", "Clear all path points")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathClear)))
-                    .then(CommandManager.literal("loop")
+                    .then(cmd("loop", "Toggle path looping")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("value", BoolArgumentType.bool())
                                 .executes(BotCommand::pathLoop))))
-                    .then(CommandManager.literal("start")
+                    .then(cmd("start", "Start bot on path")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
                             .suggests(BOT_SUGGESTIONS)
                             .then(CommandManager.argument("path", StringArgumentType.word())
                                 .suggests(PATH_SUGGESTIONS)
                                 .executes(BotCommand::pathStart))))
-                    .then(CommandManager.literal("stop")
+                    .then(cmd("stop", "Stop bot on path")
                         .then(CommandManager.argument("bot", StringArgumentType.word())
                             .suggests(BOT_SUGGESTIONS)
                             .executes(BotCommand::pathStop)))
                     .then(CommandManager.literal("list")
                         .executes(BotCommand::pathList))
-                    .then(CommandManager.literal("show")
+                    .then(cmd("show", "Show/hide path particles")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("visible", BoolArgumentType.bool())
                                 .executes(BotCommand::pathShow))))
-                    .then(CommandManager.literal("info")
+                    .then(cmd("info", "Path info")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathInfo)))
-                    .then(CommandManager.literal("distribute")
+                    .then(cmd("distribute", "Distribute bots along path")
                         .then(CommandManager.argument("path", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathDistribute)))
-                    .then(CommandManager.literal("start-near")
+                    .then(cmd("start-near", "Start bots near path")
                         .then(CommandManager.argument("path", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1))
                                 .executes(BotCommand::pathStartNear))))
-                    .then(CommandManager.literal("stop-all")
+                    .then(cmd("stop-all", "Stop all bots on path")
                         .then(CommandManager.argument("path", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathStopAll)))
-                    .then(CommandManager.literal("walk-type")
+                    .then(cmd("walk-type", "Path walk type")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                             .suggests(PATH_SUGGESTIONS)
                             .then(CommandManager.argument("type", StringArgumentType.word())
@@ -179,77 +186,77 @@ public class BotCommand {
                                 .executes(BotCommand::pathWalkType))))))
 
             // ========== KIT ==========
-            .then(CommandManager.literal("kit")
-                .then(CommandManager.literal("create-kit")
+            .then(cmd("kit", "Kit management")
+                .then(cmd("create-kit", "Create kit from inventory")
                     .then(CommandManager.argument("name", StringArgumentType.word())
                         .executes(BotCommand::kitCreate)))
-                .then(CommandManager.literal("delete-kit")
+                .then(cmd("delete-kit", "Delete a kit")
                     .then(CommandManager.argument("name", StringArgumentType.word())
                         .suggests(KIT_SUGGESTIONS)
                         .executes(BotCommand::kitDelete)))
-                .then(CommandManager.literal("give-kit")
+                .then(cmd("give-kit", "Give kit to player")
                     .then(CommandManager.argument("playername", StringArgumentType.word())
                         .suggests(PLAYER_SUGGESTIONS)
                         .then(CommandManager.argument("kitname", StringArgumentType.word())
                             .suggests(KIT_SUGGESTIONS)
                             .executes(BotCommand::kitGive))))
-                .then(CommandManager.literal("kits")
+                .then(cmd("kits", "List all kits")
                     .executes(BotCommand::kitList)))
 
             // ========== FACTION ==========
-            .then(CommandManager.literal("faction")
-                .then(CommandManager.literal("list")
+            .then(cmd("faction", "Faction management")
+                .then(cmd("list", "List all factions")
                     .executes(BotCommand::factionList))
-                .then(CommandManager.literal("create")
+                .then(cmd("create", "Create a faction")
                     .then(CommandManager.argument("name", StringArgumentType.word())
                         .executes(BotCommand::factionCreate)))
-                .then(CommandManager.literal("delete")
+                .then(cmd("delete", "Delete a faction")
                     .then(CommandManager.argument("name", StringArgumentType.word())
                         .executes(BotCommand::factionDelete)))
-                .then(CommandManager.literal("add")
+                .then(cmd("add", "Add player to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("player", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionAdd))))
-                .then(CommandManager.literal("remove")
+                .then(cmd("remove", "Remove player from faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("player", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionRemove))))
-                .then(CommandManager.literal("hostile")
+                .then(cmd("hostile", "Set faction hostility")
                     .then(CommandManager.argument("faction1", StringArgumentType.word())
                         .then(CommandManager.argument("faction2", StringArgumentType.word())
                             .then(CommandManager.argument("hostile", BoolArgumentType.bool())
                                 .executes(ctx -> factionHostile(ctx, BoolArgumentType.getBool(ctx, "hostile"))))
                             .executes(ctx -> factionHostile(ctx, true)))))
-                .then(CommandManager.literal("info")
+                .then(cmd("info", "Faction info")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .executes(BotCommand::factionInfo)))
-                .then(CommandManager.literal("add-near")
+                .then(cmd("add-near", "Add nearby players to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1, 10000))
                             .executes(BotCommand::factionAddNear))))
-                .then(CommandManager.literal("add-all")
+                .then(cmd("add-all", "Add all players to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .executes(BotCommand::factionAddAll)))
-                .then(CommandManager.literal("give")
+                .then(cmd("give", "Give item to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("item", StringArgumentType.greedyString())
                             .executes(BotCommand::factionGive))))
-                .then(CommandManager.literal("attack")
+                .then(cmd("attack", "Faction attack target")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("target", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionAttack))))
-                .then(CommandManager.literal("path")
-                    .then(CommandManager.literal("start")
+                .then(cmd("path", "Faction path control")
+                    .then(cmd("start", "Start faction on path")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
                             .then(CommandManager.argument("path", StringArgumentType.word())
                                 .executes(BotCommand::factionStartPath))))
-                    .then(CommandManager.literal("stop")
+                    .then(cmd("stop", "Stop faction on path")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
                             .executes(BotCommand::factionStopPath))))
-                .then(CommandManager.literal("give-kit")
+                .then(cmd("give-kit", "Give kit to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
                         .then(CommandManager.argument("kitname", StringArgumentType.word())
                             .suggests(KIT_SUGGESTIONS)
@@ -264,59 +271,77 @@ public class BotCommand {
         var settings = CommandManager.literal("settings")
             .executes(BotCommand::settings);
 
-        settings.then(boolSetting("auto-armor", () -> BotSettings.get().isAutoEquipArmor(), v -> BotSettings.get().setAutoEquipArmor(v)));
-        settings.then(boolSetting("auto-weapon", () -> BotSettings.get().isAutoEquipWeapon(), v -> BotSettings.get().setAutoEquipWeapon(v)));
-        settings.then(boolSetting("drop-armor", () -> BotSettings.get().isDropWorseArmor(), v -> BotSettings.get().setDropWorseArmor(v)));
-        settings.then(boolSetting("drop-weapon", () -> BotSettings.get().isDropWorseWeapons(), v -> BotSettings.get().setDropWorseWeapons(v)));
-        settings.then(doubleSetting("drop-distance", () -> BotSettings.get().getDropDistance(), v -> BotSettings.get().setDropDistance(v), 1.0, 10.0));
-        settings.then(intSetting("interval", () -> BotSettings.get().getCheckInterval(), v -> BotSettings.get().setCheckInterval(v), 1, 100));
-        settings.then(boolSetting("combat", () -> BotSettings.get().isCombatEnabled(), v -> BotSettings.get().setCombatEnabled(v)));
-        settings.then(boolSetting("revenge", () -> BotSettings.get().isRevengeEnabled(), v -> BotSettings.get().setRevengeEnabled(v)));
-        settings.then(boolSetting("auto-target", () -> BotSettings.get().isAutoTargetEnabled(), v -> BotSettings.get().setAutoTargetEnabled(v)));
-        settings.then(boolSetting("target-players", () -> BotSettings.get().isTargetPlayers(), v -> BotSettings.get().setTargetPlayers(v)));
-        settings.then(boolSetting("target-mobs", () -> BotSettings.get().isTargetHostileMobs(), v -> BotSettings.get().setTargetHostileMobs(v)));
-        settings.then(boolSetting("target-bots", () -> BotSettings.get().isTargetOtherBots(), v -> BotSettings.get().setTargetOtherBots(v)));
-        settings.then(boolSetting("criticals", () -> BotSettings.get().isCriticalsEnabled(), v -> BotSettings.get().setCriticalsEnabled(v)));
-        settings.then(intSetting("crit-fall-ticks", () -> BotSettings.get().getCriticalFallTicks(), v -> BotSettings.get().setCriticalFallTicks(v), 1, 10));
-        settings.then(boolSetting("ranged", () -> BotSettings.get().isRangedEnabled(), v -> BotSettings.get().setRangedEnabled(v)));
-        settings.then(boolSetting("mace", () -> BotSettings.get().isMaceEnabled(), v -> BotSettings.get().setMaceEnabled(v)));
-        settings.then(boolSetting("special-names", () -> BotSettings.get().isUseSpecialNames(), v -> BotSettings.get().setUseSpecialNames(v)));
-        settings.then(boolSetting("shield-mace", () -> BotSettings.get().isShieldMace(), v -> BotSettings.get().setShieldMace(v)));
-        settings.then(intSetting("attack-cooldown", () -> BotSettings.get().getAttackCooldown(), v -> BotSettings.get().setAttackCooldown(v), 1, 40));
-        settings.then(doubleSetting("melee-range", () -> BotSettings.get().getMeleeRange(), v -> BotSettings.get().setMeleeRange(v), 2.0, 6.0));
-        settings.then(doubleSetting("move-speed", () -> BotSettings.get().getMoveSpeed(), v -> BotSettings.get().setMoveSpeed(v), 0.1, 2.0));
-        settings.then(boolSetting("auto-totem", () -> BotSettings.get().isAutoTotemEnabled(), v -> BotSettings.get().setAutoTotemEnabled(v)));
-        settings.then(boolSetting("totem-priority", () -> BotSettings.get().isTotemPriority(), v -> BotSettings.get().setTotemPriority(v)));
-        settings.then(boolSetting("auto-shield", () -> BotSettings.get().isAutoShieldEnabled(), v -> BotSettings.get().setAutoShieldEnabled(v)));
-        settings.then(boolSetting("auto-potion", () -> BotSettings.get().isAutoPotionEnabled(), v -> BotSettings.get().setAutoPotionEnabled(v)));
-        settings.then(boolSetting("shield-break", () -> BotSettings.get().isShieldBreakEnabled(), v -> BotSettings.get().setShieldBreakEnabled(v)));
-        settings.then(boolSetting("prefer-sword", () -> BotSettings.get().isPreferSword(), v -> BotSettings.get().setPreferSword(v)));
-        settings.then(boolSetting("bhop", () -> BotSettings.get().isBhopEnabled(), v -> BotSettings.get().setBhopEnabled(v)));
-        settings.then(boolSetting("idle", () -> BotSettings.get().isIdleWanderEnabled(), v -> BotSettings.get().setIdleWanderEnabled(v)));
-        settings.then(doubleSetting("idle-radius", () -> BotSettings.get().getIdleWanderRadius(), v -> BotSettings.get().setIdleWanderRadius(v), 3.0, 50.0));
-        settings.then(boolSetting("friendly-fire", () -> BotSettings.get().isFriendlyFireEnabled(), v -> BotSettings.get().setFriendlyFireEnabled(v)));
-        settings.then(intSetting("miss-chance", () -> BotSettings.get().getMissChance(), v -> BotSettings.get().setMissChance(v), 0, 100));
-        settings.then(intSetting("mistake-chance", () -> BotSettings.get().getMistakeChance(), v -> BotSettings.get().setMistakeChance(v), 0, 100));
-        settings.then(intSetting("shield-break-chance", () -> BotSettings.get().getShieldBreakChance(), v -> BotSettings.get().setShieldBreakChance(v), 0, 100));
-        settings.then(intSetting("shield-hold-ticks", () -> BotSettings.get().getShieldHoldTicks(), v -> BotSettings.get().setShieldHoldTicks(v), 10, 200));
-        settings.then(intSetting("shield-raise-ticks", () -> BotSettings.get().getShieldRaiseTicks(), v -> BotSettings.get().setShieldRaiseTicks(v), 2, 40));
-        settings.then(boolSetting("retreat", () -> BotSettings.get().isRetreatEnabled(), v -> BotSettings.get().setRetreatEnabled(v)));
-        settings.then(boolSetting("auto-eat", () -> BotSettings.get().isAutoEatEnabled(), v -> BotSettings.get().setAutoEatEnabled(v)));
-        settings.then(boolSetting("auto-mend", () -> BotSettings.get().isAutoMendEnabled(), v -> BotSettings.get().setAutoMendEnabled(v)));
-        settings.then(boolSetting("bot-leave-on-death", () -> BotSettings.get().isBotLeaveOnDeath(), v -> BotSettings.get().setBotLeaveOnDeath(v)));
-        settings.then(boolSetting("attack-invincible", () -> BotSettings.get().isAttackInvincible(), v -> BotSettings.get().setAttackInvincible(v)));
-        settings.then(doubleSetting("aim-speed", () -> BotSettings.get().getAimSpeed(), v -> BotSettings.get().setAimSpeed(v), 3.0, 45.0));
-        settings.then(doubleSetting("view-distance", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0));
+        settings.then(boolSetting("auto-armor", "Auto-equip armor", () -> BotSettings.get().isAutoEquipArmor(), v -> BotSettings.get().setAutoEquipArmor(v), BotSettings.DEFAULTS::isAutoEquipArmor));
+        settings.then(boolSetting("auto-weapon", "Auto-equip best weapon", () -> BotSettings.get().isAutoEquipWeapon(), v -> BotSettings.get().setAutoEquipWeapon(v), BotSettings.DEFAULTS::isAutoEquipWeapon));
+        settings.then(boolSetting("drop-armor", "Drop worse armor on pickup", () -> BotSettings.get().isDropWorseArmor(), v -> BotSettings.get().setDropWorseArmor(v), BotSettings.DEFAULTS::isDropWorseArmor));
+        settings.then(boolSetting("drop-weapon", "Drop worse weapons on pickup", () -> BotSettings.get().isDropWorseWeapons(), v -> BotSettings.get().setDropWorseWeapons(v), BotSettings.DEFAULTS::isDropWorseWeapons));
+        settings.then(doubleSetting("drop-distance", "Drop check distance", () -> BotSettings.get().getDropDistance(), v -> BotSettings.get().setDropDistance(v), 1.0, 10.0, BotSettings.DEFAULTS::getDropDistance));
+        settings.then(intSetting("interval", "Equipment check interval (ticks)", () -> BotSettings.get().getCheckInterval(), v -> BotSettings.get().setCheckInterval(v), 1, 100, BotSettings.DEFAULTS::getCheckInterval));
+        settings.then(boolSetting("combat", "Enable combat AI", () -> BotSettings.get().isCombatEnabled(), v -> BotSettings.get().setCombatEnabled(v), BotSettings.DEFAULTS::isCombatEnabled));
+        settings.then(boolSetting("revenge", "Auto-attack last damager", () -> BotSettings.get().isRevengeEnabled(), v -> BotSettings.get().setRevengeEnabled(v), BotSettings.DEFAULTS::isRevengeEnabled));
+        settings.then(boolSetting("auto-target", "Auto-target nearest player", () -> BotSettings.get().isAutoTargetEnabled(), v -> BotSettings.get().setAutoTargetEnabled(v), BotSettings.DEFAULTS::isAutoTargetEnabled));
+        settings.then(boolSetting("target-players", "Target real players", () -> BotSettings.get().isTargetPlayers(), v -> BotSettings.get().setTargetPlayers(v), BotSettings.DEFAULTS::isTargetPlayers));
+        settings.then(boolSetting("target-mobs", "Target hostile mobs", () -> BotSettings.get().isTargetHostileMobs(), v -> BotSettings.get().setTargetHostileMobs(v), BotSettings.DEFAULTS::isTargetHostileMobs));
+        settings.then(boolSetting("target-bots", "Target other bots", () -> BotSettings.get().isTargetOtherBots(), v -> BotSettings.get().setTargetOtherBots(v), BotSettings.DEFAULTS::isTargetOtherBots));
+        settings.then(boolSetting("criticals", "Jump-crit on melee attacks", () -> BotSettings.get().isCriticalsEnabled(), v -> BotSettings.get().setCriticalsEnabled(v), BotSettings.DEFAULTS::isCriticalsEnabled));
+        settings.then(intSetting("crit-fall-ticks", "Falling ticks before crit attack", () -> BotSettings.get().getCriticalFallTicks(), v -> BotSettings.get().setCriticalFallTicks(v), 1, 10, BotSettings.DEFAULTS::getCriticalFallTicks));
+        settings.then(boolSetting("ranged", "Use bows/crossbows", () -> BotSettings.get().isRangedEnabled(), v -> BotSettings.get().setRangedEnabled(v), BotSettings.DEFAULTS::isRangedEnabled));
+        settings.then(doubleSetting("ranged-min-range", "Min bow distance", () -> BotSettings.get().getRangedMinRange(), v -> BotSettings.get().setRangedMinRange(v), 3.0, 20.0, BotSettings.DEFAULTS::getRangedMinRange));
+        settings.then(doubleSetting("ranged-optimal-range", "Ideal bow distance", () -> BotSettings.get().getRangedOptimalRange(), v -> BotSettings.get().setRangedOptimalRange(v), 10.0, 50.0, BotSettings.DEFAULTS::getRangedOptimalRange));
+        settings.then(doubleSetting("ranged-max-range", "Max bow engagement range", () -> BotSettings.get().getRangedMaxRange(), v -> BotSettings.get().setRangedMaxRange(v), 15.0, 100.0, BotSettings.DEFAULTS::getRangedMaxRange));
+        settings.then(intSetting("bow-draw-ticks", "Bow full draw time (ticks)", () -> BotSettings.get().getBowMinDrawTime(), v -> BotSettings.get().setBowMinDrawTime(v), 5, 100, BotSettings.DEFAULTS::getBowMinDrawTime));
+        settings.then(boolSetting("arrow-prediction", "Predictive bow aiming", () -> BotSettings.get().isArrowPredictionEnabled(), v -> BotSettings.get().setArrowPredictionEnabled(v), BotSettings.DEFAULTS::isArrowPredictionEnabled));
+        settings.then(boolSetting("ranged-strafe", "Strafe while shooting bow", () -> BotSettings.get().isRangedStrafeEnabled(), v -> BotSettings.get().setRangedStrafeEnabled(v), BotSettings.DEFAULTS::isRangedStrafeEnabled));
+        settings.then(boolSetting("ranged-retreat", "Retreat with bow when target close", () -> BotSettings.get().isRangedRetreatOnClose(), v -> BotSettings.get().setRangedRetreatOnClose(v), BotSettings.DEFAULTS::isRangedRetreatOnClose));
+        settings.then(boolSetting("mace", "Use mace smash attack", () -> BotSettings.get().isMaceEnabled(), v -> BotSettings.get().setMaceEnabled(v), BotSettings.DEFAULTS::isMaceEnabled));
+        settings.then(boolSetting("special-names", "Use special bot names", () -> BotSettings.get().isUseSpecialNames(), v -> BotSettings.get().setUseSpecialNames(v), BotSettings.DEFAULTS::isUseSpecialNames));
+        settings.then(boolSetting("shield-mace", "Auto-shield against mace", () -> BotSettings.get().isShieldMace(), v -> BotSettings.get().setShieldMace(v), BotSettings.DEFAULTS::isShieldMace));
+        settings.then(intSetting("attack-cooldown", "Ticks between melee attacks", () -> BotSettings.get().getAttackCooldown(), v -> BotSettings.get().setAttackCooldown(v), 1, 40, BotSettings.DEFAULTS::getAttackCooldown));
+        settings.then(doubleSetting("melee-range", "Melee attack range", () -> BotSettings.get().getMeleeRange(), v -> BotSettings.get().setMeleeRange(v), 2.0, 6.0, BotSettings.DEFAULTS::getMeleeRange));
+        settings.then(doubleSetting("move-speed", "Movement speed multiplier", () -> BotSettings.get().getMoveSpeed(), v -> BotSettings.get().setMoveSpeed(v), 0.1, 2.0, BotSettings.DEFAULTS::getMoveSpeed));
+        settings.then(boolSetting("auto-totem", "Auto-equip totem to offhand", () -> BotSettings.get().isAutoTotemEnabled(), v -> BotSettings.get().setAutoTotemEnabled(v), BotSettings.DEFAULTS::isAutoTotemEnabled));
+        settings.then(boolSetting("totem-priority", "Keep totem over shield in offhand", () -> BotSettings.get().isTotemPriority(), v -> BotSettings.get().setTotemPriority(v), BotSettings.DEFAULTS::isTotemPriority));
+        settings.then(boolSetting("auto-shield", "Auto-use shield", () -> BotSettings.get().isAutoShieldEnabled(), v -> BotSettings.get().setAutoShieldEnabled(v), BotSettings.DEFAULTS::isAutoShieldEnabled));
+        settings.then(boolSetting("auto-potion", "Auto-use potions", () -> BotSettings.get().isAutoPotionEnabled(), v -> BotSettings.get().setAutoPotionEnabled(v), BotSettings.DEFAULTS::isAutoPotionEnabled));
+        settings.then(boolSetting("shield-break", "Auto-axe enemy shield", () -> BotSettings.get().isShieldBreakEnabled(), v -> BotSettings.get().setShieldBreakEnabled(v), BotSettings.DEFAULTS::isShieldBreakEnabled));
+        settings.then(boolSetting("prefer-sword", "Prefer sword over axe", () -> BotSettings.get().isPreferSword(), v -> BotSettings.get().setPreferSword(v), BotSettings.DEFAULTS::isPreferSword));
+        settings.then(boolSetting("bhop", "Bunny-hop movement", () -> BotSettings.get().isBhopEnabled(), v -> BotSettings.get().setBhopEnabled(v), BotSettings.DEFAULTS::isBhopEnabled));
+        settings.then(boolSetting("idle", "Wander when idle", () -> BotSettings.get().isIdleWanderEnabled(), v -> BotSettings.get().setIdleWanderEnabled(v), BotSettings.DEFAULTS::isIdleWanderEnabled));
+        settings.then(doubleSetting("idle-radius", "Idle wander radius", () -> BotSettings.get().getIdleWanderRadius(), v -> BotSettings.get().setIdleWanderRadius(v), 3.0, 50.0, BotSettings.DEFAULTS::getIdleWanderRadius));
+        settings.then(boolSetting("friendly-fire", "Allow attacking allies", () -> BotSettings.get().isFriendlyFireEnabled(), v -> BotSettings.get().setFriendlyFireEnabled(v), BotSettings.DEFAULTS::isFriendlyFireEnabled));
+        settings.then(intSetting("miss-chance", "Chance to miss (%)", () -> BotSettings.get().getMissChance(), v -> BotSettings.get().setMissChance(v), 0, 100, BotSettings.DEFAULTS::getMissChance));
+        settings.then(intSetting("mistake-chance", "Chance to aim wrong (%)", () -> BotSettings.get().getMistakeChance(), v -> BotSettings.get().setMistakeChance(v), 0, 100, BotSettings.DEFAULTS::getMistakeChance));
+        settings.then(intSetting("shield-break-chance", "Shield break attempt chance (%)", () -> BotSettings.get().getShieldBreakChance(), v -> BotSettings.get().setShieldBreakChance(v), 0, 100, BotSettings.DEFAULTS::getShieldBreakChance));
+        settings.then(intSetting("shield-hold-ticks", "Max ticks to hold shield", () -> BotSettings.get().getShieldHoldTicks(), v -> BotSettings.get().setShieldHoldTicks(v), 10, 200, BotSettings.DEFAULTS::getShieldHoldTicks));
+        settings.then(intSetting("shield-raise-ticks", "Ticks to predict enemy attack", () -> BotSettings.get().getShieldRaiseTicks(), v -> BotSettings.get().setShieldRaiseTicks(v), 2, 40, BotSettings.DEFAULTS::getShieldRaiseTicks));
+        settings.then(boolSetting("retreat", "Retreat when low HP", () -> BotSettings.get().isRetreatEnabled(), v -> BotSettings.get().setRetreatEnabled(v), BotSettings.DEFAULTS::isRetreatEnabled));
+        settings.then(boolSetting("auto-eat", "Auto-eat when hungry", () -> BotSettings.get().isAutoEatEnabled(), v -> BotSettings.get().setAutoEatEnabled(v), BotSettings.DEFAULTS::isAutoEatEnabled));
+        settings.then(boolSetting("auto-mend", "Auto-use XP for mending", () -> BotSettings.get().isAutoMendEnabled(), v -> BotSettings.get().setAutoMendEnabled(v), BotSettings.DEFAULTS::isAutoMendEnabled));
+        settings.then(boolSetting("bot-leave-on-death", "Bot leaves on death", () -> BotSettings.get().isBotLeaveOnDeath(), v -> BotSettings.get().setBotLeaveOnDeath(v), BotSettings.DEFAULTS::isBotLeaveOnDeath));
+        settings.then(boolSetting("attack-invincible", "Attack creative/spectator", () -> BotSettings.get().isAttackInvincible(), v -> BotSettings.get().setAttackInvincible(v), BotSettings.DEFAULTS::isAttackInvincible));
+        settings.then(doubleSetting("aim-speed", "Aim rotation speed", () -> BotSettings.get().getAimSpeed(), v -> BotSettings.get().setAimSpeed(v), 3.0, 45.0, BotSettings.DEFAULTS::getAimSpeed));
+        settings.then(doubleSetting("view-distance", "Max target acquisition range", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0, BotSettings.DEFAULTS::getMaxTargetDistance));
+        settings.then(intSetting("max-mass-spawn", "Max bots per mass-spawn command", () -> BotSettings.get().getMaxMassSpawn(), v -> BotSettings.get().setMaxMassSpawn(v), 50, 10000, BotSettings.DEFAULTS::getMaxMassSpawn));
 
         return settings;
     }
 
+    // ========== FAST COMMANDS ==========
+
+    private static final SuggestionProvider<ServerCommandSource> FACTION_SUGGESTIONS =
+        (ctx, builder) -> {
+            for (String f : BotFaction.getAllFactions()) {
+                builder.suggest(f);
+            }
+            return builder.buildFuture();
+        };
+
     // ========== SETTING HELPERS ==========
 
-    private static LiteralArgumentBuilder<ServerCommandSource> boolSetting(String name, BooleanSupplier getter, Consumer<Boolean> setter) {
+    private static LiteralArgumentBuilder<ServerCommandSource> boolSetting(String name, String desc, BooleanSupplier getter, Consumer<Boolean> setter, BooleanSupplier defaultGetter) {
         return CommandManager.literal(name)
             .executes(ctx -> {
-                ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + getter.getAsBoolean()), false);
+                ctx.getSource().sendFeedback(() -> Text.literal("§7[Tip] §a" + desc + " §7(current: " + getter.getAsBoolean() + ", default: " + defaultGetter.getAsBoolean() + ")"), false);
                 return 1;
             })
             .then(CommandManager.argument("value", BoolArgumentType.bool())
@@ -328,10 +353,10 @@ public class BotCommand {
                 }));
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> intSetting(String name, java.util.function.IntSupplier getter, java.util.function.IntConsumer setter, int min, int max) {
+    private static LiteralArgumentBuilder<ServerCommandSource> intSetting(String name, String desc, java.util.function.IntSupplier getter, java.util.function.IntConsumer setter, int min, int max, java.util.function.IntSupplier defaultGetter) {
         return CommandManager.literal(name)
             .executes(ctx -> {
-                ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + getter.getAsInt()), false);
+                ctx.getSource().sendFeedback(() -> Text.literal("§7[Tip] §a" + desc + " §7(current: " + getter.getAsInt() + ", default: " + defaultGetter.getAsInt() + ")"), false);
                 return 1;
             })
             .then(CommandManager.argument("value", IntegerArgumentType.integer(min, max))
@@ -343,10 +368,10 @@ public class BotCommand {
                 }));
     }
 
-    private static LiteralArgumentBuilder<ServerCommandSource> doubleSetting(String name, java.util.function.DoubleSupplier getter, java.util.function.DoubleConsumer setter, double min, double max) {
+    private static LiteralArgumentBuilder<ServerCommandSource> doubleSetting(String name, String desc, java.util.function.DoubleSupplier getter, java.util.function.DoubleConsumer setter, double min, double max, java.util.function.DoubleSupplier defaultGetter) {
         return CommandManager.literal(name)
             .executes(ctx -> {
-                ctx.getSource().sendFeedback(() -> Text.literal(name + ": " + getter.getAsDouble()), false);
+                ctx.getSource().sendFeedback(() -> Text.literal("§7[Tip] §a" + desc + " §7(current: " + getter.getAsDouble() + ", default: " + defaultGetter.getAsDouble() + ")"), false);
                 return 1;
             })
             .then(CommandManager.argument("value", DoubleArgumentType.doubleArg(min, max))
@@ -382,7 +407,12 @@ public class BotCommand {
         var source = ctx.getSource();
         var server = source.getServer();
         int count = IntegerArgumentType.getInteger(ctx, "count");
-        source.sendFeedback(() -> Text.literal("Spawning " + count + " bots "), false);
+        int maxAllowed = BotSettings.get().getMaxMassSpawn();
+        if (count > maxAllowed) {
+            source.sendError(Text.literal("Cannot spawn more than " + maxAllowed + " bots at once. Use /pvpbot settings max-mass-spawn to increase the limit."));
+            return 0;
+        }
+        source.sendFeedback(() -> Text.literal("Spawning " + count + " bots..."), false);
         int[] spawned = {0};
         int[] current = {0};
         scheduleSpawn(server, source, count, spawned, current);
@@ -465,6 +495,13 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("target-bots: " + s.isTargetOtherBots()), false);
         source.sendFeedback(() -> Text.literal("criticals: " + s.isCriticalsEnabled()), false);
         source.sendFeedback(() -> Text.literal("ranged: " + s.isRangedEnabled()), false);
+        source.sendFeedback(() -> Text.literal("ranged-min-range: " + s.getRangedMinRange()), false);
+        source.sendFeedback(() -> Text.literal("ranged-optimal-range: " + s.getRangedOptimalRange()), false);
+        source.sendFeedback(() -> Text.literal("ranged-max-range: " + s.getRangedMaxRange()), false);
+        source.sendFeedback(() -> Text.literal("bow-draw-ticks: " + s.getBowMinDrawTime() + " ticks"), false);
+        source.sendFeedback(() -> Text.literal("arrow-prediction: " + s.isArrowPredictionEnabled()), false);
+        source.sendFeedback(() -> Text.literal("ranged-strafe: " + s.isRangedStrafeEnabled()), false);
+        source.sendFeedback(() -> Text.literal("ranged-retreat: " + s.isRangedRetreatOnClose()), false);
         source.sendFeedback(() -> Text.literal("mace: " + s.isMaceEnabled()), false);
         source.sendFeedback(() -> Text.literal("special-names: " + s.isUseSpecialNames()), false);
         source.sendFeedback(() -> Text.literal("shield-mace: " + s.isShieldMace()), false);

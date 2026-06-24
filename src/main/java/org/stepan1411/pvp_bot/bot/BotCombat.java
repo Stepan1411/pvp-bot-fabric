@@ -67,6 +67,8 @@ public class BotCombat {
         public int shieldHoldTicks = 0;
         public int shieldHitTicks = 0;
         public int critFallTicks = 0;
+        public int strafeCooldown = 0;
+        public int strafeDir = 1;
         
         public enum WeaponMode {
             MELEE,
@@ -389,9 +391,35 @@ public class BotCombat {
 
             return;
         }
-        state.isRetreating = false;
         
-
+        // === RANGED RETREAT: low HP + no food → back up and use bow ===
+        boolean shouldRangedRetreat = settings.isRetreatEnabled() && !hasFood &&
+                                      healthPercent < 0.5f && hasRangedWeaponInInventory(bot) &&
+                                      settings.isRangedEnabled();
+        
+        if (shouldRangedRetreat) {
+            var inv = bot.getInventory();
+            int rangedSlot = findRangedWeapon(inv);
+            if (rangedSlot >= 0 && hasArrows(inv)) {
+                state.isRetreating = true;
+                double safeDist = settings.getRangedOptimalRange();
+                if (distance < safeDist - 5) {
+                    if (state.isDrawingBow) {
+                        stopUsingBow(bot, state);
+                    }
+                    BotNavigation.lookAway(bot, target);
+                    BotNavigation.moveAway(bot, target, 1.3);
+                    return;
+                }
+                state.currentMode = CombatState.WeaponMode.RANGED;
+            } else {
+                state.isRetreating = false;
+            }
+        } else {
+            state.isRetreating = false;
+        }
+        
+ 
         if (utilsState.isMending) {
             return;
         }
@@ -412,7 +440,7 @@ public class BotCombat {
 
         double maxRange = switch (state.currentMode) {
             case MELEE -> settings.getMeleeRange() * 2;
-            case RANGED -> settings.getRangedOptimalRange() + 15;
+            case RANGED -> settings.getRangedMaxRange();
             case MACE -> settings.getMaceRange() * 2;
             case SPEAR -> settings.getSpearChargeRange();
             case CRYSTAL -> 10.0;
@@ -650,6 +678,8 @@ public class BotCombat {
     
     
     private static void selectWeaponMode(ServerPlayerEntity bot, CombatState state, double distance, BotSettings settings) {
+        if (state.isRetreating) return;
+        if (state.isDrawingBow && settings.isRangedRetreatOnClose()) return;
         var inventory = bot.getInventory();
         Entity target = state.target;
         
@@ -672,10 +702,10 @@ public class BotCombat {
             state.currentMode = CombatState.WeaponMode.MACE;
         } else if (hasSpear && distance <= spearRange && settings.isSpearEnabled()) {
             state.currentMode = CombatState.WeaponMode.SPEAR;
+        } else if (!settings.isRangedRetreatOnClose() && hasMelee && distance <= meleeRange * 2) {
+            state.currentMode = CombatState.WeaponMode.MELEE;
         } else if (hasRanged && distance > rangedMinRange && settings.isRangedEnabled()) {
             state.currentMode = CombatState.WeaponMode.RANGED;
-        } else if (hasMelee && distance <= meleeRange * 2) {
-            state.currentMode = CombatState.WeaponMode.MELEE;
         } else if (hasSpear && settings.isSpearEnabled()) {
             state.currentMode = CombatState.WeaponMode.SPEAR;
         } else if (hasRanged && settings.isRangedEnabled()) {
@@ -1020,6 +1050,26 @@ public class BotCombat {
             return;
         }
         
+
+        if (distance <= settings.getMeleeRange()) {
+            if (settings.isRangedRetreatOnClose()) {
+                double dx = bot.getX() - target.getX();
+                double dz = bot.getZ() - target.getZ();
+                double dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > 0) {
+                    dx /= dist;
+                    dz /= dist;
+                    bot.addVelocity(dx * settings.getMoveSpeed() * 0.15, 0, dz * settings.getMoveSpeed() * 0.15);
+                }
+            } else if (findMeleeWeapon(bot.getInventory()) >= 0) {
+                if (state.isDrawingBow) {
+                    stopUsingBow(bot, state);
+                }
+                state.currentMode = CombatState.WeaponMode.MELEE;
+                return;
+            }
+        }
+        
         var inventory = bot.getInventory();
         
 
@@ -1045,8 +1095,29 @@ public class BotCombat {
         }
         
 
-        double optimalRange = settings.getRangedOptimalRange();
-        if (distance < optimalRange - 5) {
+        if (settings.isRangedStrafeEnabled()) {
+            state.strafeCooldown--;
+            if (state.strafeCooldown <= 0) {
+                state.strafeDir = -state.strafeDir;
+                state.strafeCooldown = 20 + random.nextInt(20);
+            }
+            bot.sidewaysSpeed = (float) (settings.getMoveSpeed() * 0.6 * state.strafeDir);
+        }
+
+        double minRange = settings.getRangedMinRange();
+        if (state.isRetreating) {
+            double safeDist = settings.getRangedOptimalRange();
+            if (distance < safeDist) {
+                double dx = bot.getX() - target.getX();
+                double dz = bot.getZ() - target.getZ();
+                double dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > 0) {
+                    dx /= dist;
+                    dz /= dist;
+                    bot.addVelocity(dx * settings.getMoveSpeed() * 0.05, 0, dz * settings.getMoveSpeed() * 0.05);
+                }
+            }
+        } else if (distance < minRange) {
 
             double dx = bot.getX() - target.getX();
             double dz = bot.getZ() - target.getZ();
@@ -1057,7 +1128,7 @@ public class BotCombat {
                 bot.addVelocity(dx * settings.getMoveSpeed() * 0.05, 0, dz * settings.getMoveSpeed() * 0.05);
 
             }
-        } else if (distance > optimalRange + 10) {
+        } else if (distance > minRange + 2) {
             BotNavigation.moveToward(bot, target, settings.getMoveSpeed());
         }
     }
@@ -1072,9 +1143,13 @@ public class BotCombat {
             state.bowDrawTicks++;
             
 
+            float drawProgress = Math.min(1.0f, state.bowDrawTicks / 20.0f);
+            lookAtTargetWithPrediction(bot, target, drawProgress, settings);
+
             int minDrawTime = settings.getBowMinDrawTime();
             if (state.bowDrawTicks >= minDrawTime) {
 
+                lookAtTargetWithPrediction(bot, target, drawProgress, settings);
                 bot.stopUsingItem();
                 state.isDrawingBow = false;
                 state.bowDrawTicks = 0;
@@ -1088,6 +1163,7 @@ public class BotCombat {
         
         if (CrossbowItem.isCharged(crossbow)) {
 
+            lookAtTargetWithPrediction(bot, target, 1.0f, settings);
             bot.stopUsingItem();
             state.attackCooldown = 5;
             state.isDrawingBow = false;
@@ -1100,6 +1176,7 @@ public class BotCombat {
             state.bowDrawTicks++;
 
             if (state.bowDrawTicks >= 25) {
+                lookAtTargetWithPrediction(bot, target, 1.0f, settings);
                 bot.stopUsingItem();
                 state.isDrawingBow = false;
             }
@@ -1415,6 +1492,50 @@ public class BotCombat {
     }
     
     
+    private static void lookAtTargetWithPrediction(ServerPlayerEntity bot, Entity target, float drawProgress, BotSettings settings) {
+        if (!settings.isArrowPredictionEnabled()) {
+            lookAtTarget(bot, target);
+            return;
+        }
+
+        double arrowSpeed = Math.max(0.5, drawProgress * 3.0);
+
+        Vec3d botPos = bot.getEyePos();
+        Vec3d targetPos = target.getEyePos();
+        Vec3d targetVel = target.getVelocity();
+
+        double dx = targetPos.x - botPos.x;
+        double dy = targetPos.y - botPos.y;
+        double dz = targetPos.z - botPos.z;
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        double effectiveSpeed = arrowSpeed * 0.95;
+        if (effectiveSpeed <= 0) effectiveSpeed = 1.0;
+
+        double flightTime = distance / effectiveSpeed;
+        flightTime = Math.min(flightTime, 60);
+
+        double px = targetPos.x + targetVel.x * flightTime;
+        double py = targetPos.y + targetVel.y * flightTime;
+        double pz = targetPos.z + targetVel.z * flightTime;
+
+        double gravityDrop = 0.5 * 0.05 * flightTime * flightTime;
+        py += gravityDrop;
+
+        double aimDx = px - botPos.x;
+        double aimDy = py - botPos.y;
+        double aimDz = pz - botPos.z;
+
+        double horizontalDist = Math.sqrt(aimDx * aimDx + aimDz * aimDz);
+
+        float yaw = (float) (MathHelper.atan2(aimDz, aimDx) * (180.0 / Math.PI)) - 90.0f;
+        float pitch = (float) -(MathHelper.atan2(aimDy, horizontalDist) * (180.0 / Math.PI));
+
+        bot.setYaw(yaw);
+        bot.setPitch(pitch);
+        bot.setHeadYaw(yaw);
+    }
+
     private static void moveToward(ServerPlayerEntity bot, Entity target, double speed) {
         double botX = bot.getX(), botY = bot.getY(), botZ = bot.getZ();
         double targetX = target.getX(), targetY = target.getY(), targetZ = target.getZ();
@@ -1699,6 +1820,11 @@ public class BotCombat {
             if (stack.getItem() instanceof ArrowItem) return true;
         }
         return false;
+    }
+    
+    private static boolean hasRangedWeaponInInventory(ServerPlayerEntity bot) {
+        var inv = bot.getInventory();
+        return findRangedWeapon(inv) >= 0;
     }
     
 
