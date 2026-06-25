@@ -24,7 +24,7 @@ public class BotTicker {
         int interval = BotSettings.get().getCheckInterval();
         
 
-        if (tickCounter % 20 == 0) {
+        if (tickCounter % 10 == 0) {
             BotManager.cleanupDeadBots(server);
 
         }

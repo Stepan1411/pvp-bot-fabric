@@ -10,6 +10,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.GameMode;
 import org.stepan1411.pvp_bot.config.WorldConfigHelper;
 import org.stepan1411.pvp_bot.fixes.ProfileLagFix;
+import org.stepan1411.pvp_bot.stats.StatsCollector;
+import org.stepan1411.pvp_bot.stats.StatsSender;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -26,7 +28,7 @@ public class BotManager {
     private static final Set<String> bots = new HashSet<>();
     private static final Map<String, BotData> botDataMap = new HashMap<>();
     private static final Map<String, Integer> nullTickCount = new HashMap<>();
-    private static final int MAX_NULL_TICKS = 100;
+    private static final int MAX_NULL_TICKS = 5;
     private static Path savePath;
     private static boolean initialized = false;
 
@@ -304,7 +306,8 @@ public class BotManager {
 
             }
         }
-        
+        StatsCollector.get().incrementSpawns(name);
+        StatsSender.getInstance().sendNow();
 
 
         server.execute(() -> {
@@ -441,6 +444,8 @@ public class BotManager {
                     BotUtils.removeState(name);
                     BotNavigation.resetIdle(name);
                     nullTickCount.remove(name);
+                    StatsCollector.get().incrementKills();
+                    StatsSender.getInstance().sendNow();
                     changed = true;
                     System.out.println("[PVP_BOT] Removed dead bot (entity gone): " + name);
                 }
@@ -455,8 +460,9 @@ public class BotManager {
                 BotCombat.removeState(name);
                 BotUtils.removeState(name);
                 BotNavigation.resetIdle(name);
-                
-                // Kick the dead bot from server
+                StatsCollector.get().incrementKills();
+                StatsSender.getInstance().sendNow();
+
                 try {
                     var dispatcher = server.getCommandManager().getDispatcher();
                     dispatcher.execute("player " + name + " kill", server.getCommandSource());
