@@ -28,32 +28,45 @@ public class BotCommand {
 
     private static final SuggestionProvider<ServerCommandSource> BOT_SUGGESTIONS =
         (ctx, builder) -> {
+            String remaining = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
             for (String bot : BotManager.getAllBots()) {
-                builder.suggest(bot);
+                if (bot.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
+                    builder.suggest(bot);
+                }
             }
             return builder.buildFuture();
         };
 
     private static final SuggestionProvider<ServerCommandSource> KIT_SUGGESTIONS =
         (ctx, builder) -> {
+            String remaining = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
             for (String kit : BotKits.getKitNames()) {
-                builder.suggest(kit);
+                if (kit.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
+                    builder.suggest(kit);
+                }
             }
             return builder.buildFuture();
         };
 
     private static final SuggestionProvider<ServerCommandSource> PLAYER_SUGGESTIONS =
         (ctx, builder) -> {
+            String remaining = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
             for (var player : ctx.getSource().getServer().getPlayerManager().getPlayerList()) {
-                builder.suggest(player.getName().getString());
+                String name = player.getName().getString();
+                if (name.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
+                    builder.suggest(name);
+                }
             }
             return builder.buildFuture();
         };
 
     private static final SuggestionProvider<ServerCommandSource> PATH_SUGGESTIONS =
         (ctx, builder) -> {
+            String remaining = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
             for (String pathName : BotPath.getAllPaths().keySet()) {
-                builder.suggest(pathName);
+                if (pathName.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
+                    builder.suggest(pathName);
+                }
             }
             return builder.buildFuture();
         };
@@ -115,7 +128,6 @@ public class BotCommand {
                 .then(cmd("path", "Path management")
                     .then(cmd("create", "Create a path")
                         .then(CommandManager.argument("name", StringArgumentType.word())
-                            .suggests(PATH_SUGGESTIONS)
                             .executes(BotCommand::pathCreate)))
                     .then(cmd("delete", "Delete a path")
                         .then(CommandManager.argument("name", StringArgumentType.word())
@@ -224,49 +236,62 @@ public class BotCommand {
                         .executes(BotCommand::factionCreate)))
                 .then(cmd("delete", "Delete a faction")
                     .then(CommandManager.argument("name", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .executes(BotCommand::factionDelete)))
                 .then(cmd("add", "Add player to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .then(CommandManager.argument("player", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionAdd))))
                 .then(cmd("remove", "Remove player from faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .then(CommandManager.argument("player", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionRemove))))
                 .then(cmd("hostile", "Set faction hostility")
                     .then(CommandManager.argument("faction1", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .then(CommandManager.argument("faction2", StringArgumentType.word())
+                            .suggests(FACTION_SUGGESTIONS)
                             .then(CommandManager.argument("hostile", BoolArgumentType.bool())
                                 .executes(ctx -> factionHostile(ctx, BoolArgumentType.getBool(ctx, "hostile"))))
                             .executes(ctx -> factionHostile(ctx, true)))))
                 .then(cmd("info", "Faction info")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .executes(BotCommand::factionInfo)))
                 .then(cmd("add-near", "Add nearby players to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1, 10000))
                             .executes(BotCommand::factionAddNear))))
                 .then(cmd("add-all", "Add all players to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .executes(BotCommand::factionAddAll)))
                 .then(cmd("give", "Give item to faction")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .then(CommandManager.argument("item", StringArgumentType.greedyString())
                             .executes(BotCommand::factionGive))))
                 .then(cmd("attack", "Faction attack target")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
                         .then(CommandManager.argument("target", StringArgumentType.word())
                             .suggests(PLAYER_SUGGESTIONS)
                             .executes(BotCommand::factionAttack))))
                 .then(cmd("path", "Faction path control")
                     .then(cmd("start", "Start faction on path")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .suggests(FACTION_SUGGESTIONS)
                             .then(CommandManager.argument("path", StringArgumentType.word())
+                                .suggests(PATH_SUGGESTIONS)
                                 .executes(BotCommand::factionStartPath))))
                     .then(cmd("stop", "Stop faction on path")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .suggests(FACTION_SUGGESTIONS)
                             .executes(BotCommand::factionStopPath))))
                 .then(cmd("tp", "Teleport faction bots to location")
                     .then(CommandManager.argument("faction", StringArgumentType.word())
@@ -277,6 +302,7 @@ public class BotCommand {
                 .then(cmd("kit", "Faction kit management")
                     .then(cmd("give-kit", "Give kit to faction")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .suggests(FACTION_SUGGESTIONS)
                             .then(CommandManager.argument("kitname", StringArgumentType.word())
                                 .suggests(KIT_SUGGESTIONS)
                                 .executes(BotCommand::factionGiveKit))))
@@ -392,8 +418,11 @@ public class BotCommand {
 
     private static final SuggestionProvider<ServerCommandSource> FACTION_SUGGESTIONS =
         (ctx, builder) -> {
+            String remaining = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
             for (String f : BotFaction.getAllFactions()) {
-                builder.suggest(f);
+                if (f.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
+                    builder.suggest(f);
+                }
             }
             return builder.buildFuture();
         };
