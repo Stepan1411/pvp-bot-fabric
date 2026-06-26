@@ -268,6 +268,12 @@ public class BotCommand {
                     .then(cmd("stop", "Stop faction on path")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
                             .executes(BotCommand::factionStopPath))))
+                .then(cmd("tp", "Teleport faction bots to location")
+                    .then(CommandManager.argument("faction", StringArgumentType.word())
+                        .suggests(FACTION_SUGGESTIONS)
+                        .then(CommandManager.argument("location", StringArgumentType.greedyString())
+                            .suggests(PLAYER_SUGGESTIONS)
+                            .executes(BotCommand::factionTp))))
                 .then(cmd("kit", "Faction kit management")
                     .then(cmd("give-kit", "Give kit to faction")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
@@ -1519,4 +1525,97 @@ public class BotCommand {
         }
     }
 
+    // ========== FACTION TP ==========
+
+    private static int factionTp(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String faction = StringArgumentType.getString(ctx, "faction");
+        if (!BotFaction.getAllFactions().contains(faction)) {
+            source.sendError(Text.literal("Faction '" + faction + "' not found!"));
+            return 0;
+        }
+        String location = StringArgumentType.getString(ctx, "location");
+        String[] parts = location.split(" ");
+        double tx, ty, tz;
+        if (parts.length == 3) {
+            var player = source.getPlayer();
+            double ox = (player != null) ? player.getX() : 0;
+            double oy = (player != null) ? player.getY() : 0;
+            double oz = (player != null) ? player.getZ() : 0;
+            try {
+                tx = parseCoord(parts[0], ox);
+                ty = parseCoord(parts[1], oy);
+                tz = parseCoord(parts[2], oz);
+            } catch (NumberFormatException e) {
+                source.sendError(Text.literal("Invalid coordinates. Usage: /pvpbot faction tp <faction> <x y z> or <playername>"));
+                return 0;
+            }
+        } else {
+            var server = source.getServer();
+            var target = server.getPlayerManager().getPlayer(location);
+            if (target == null) {
+                source.sendError(Text.literal("Player or bot '" + location + "' not found!"));
+                return 0;
+            }
+            tx = target.getX();
+            ty = target.getY();
+            tz = target.getZ();
+        }
+        var members = new java.util.ArrayList<>(BotFaction.getMembers(faction));
+        members.removeIf(m -> !BotManager.getAllBots().contains(m));
+        if (members.isEmpty()) {
+            source.sendError(Text.literal("Faction '" + faction + "' has no bots!"));
+            return 0;
+        }
+        source.sendFeedback(() -> Text.literal("Teleporting " + members.size() + " bots in faction '" + faction + "'..."), false);
+        var server = source.getServer();
+        boolean safe = BotSettings.get().isSafeSpawn();
+        int[] count = {0};
+        scheduleFactionTp(server, source, members, tx, ty, tz, safe, 0, count);
+        return 1;
+    }
+
+    private static double parseCoord(String s, double origin) {
+        if (s.startsWith("~")) {
+            double offset = s.length() > 1 ? Double.parseDouble(s.substring(1)) : 0;
+            return origin + offset;
+        }
+        return Double.parseDouble(s);
+    }
+
+    private static final java.util.concurrent.ScheduledExecutorService TP_SCHEDULER =
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "FactionTP");
+            t.setDaemon(true);
+            return t;
+        });
+
+    private static void scheduleFactionTp(MinecraftServer server, ServerCommandSource source,
+                                          java.util.List<String> members, double tx, double ty, double tz,
+                                          boolean safe, int index, int[] count) {
+        if (index >= members.size()) {
+            source.sendFeedback(() -> Text.literal("Teleported " + count[0] + " bots in faction"), true);
+            return;
+        }
+        int end = Math.min(index + 5, members.size());
+        TP_SCHEDULER.schedule(() -> server.execute(() -> {
+            var rng = java.util.concurrent.ThreadLocalRandom.current();
+            for (int i = index; i < end; i++) {
+                String name = members.get(i);
+                double x = tx, z = tz;
+                if (safe) {
+                    x += (rng.nextDouble() * 0.4 + 0.1) * (rng.nextBoolean() ? 1 : -1);
+                    z += (rng.nextDouble() * 0.4 + 0.1) * (rng.nextBoolean() ? 1 : -1);
+                }
+                ServerPlayerEntity bot = BotManager.getBot(server, name);
+                if (bot != null) {
+                    bot.teleport((net.minecraft.server.world.ServerWorld) bot.getEntityWorld(), x, ty, tz, java.util.Set.of(), 0.0f, 0.0f, false);
+                    count[0]++;
+                }
+            }
+            scheduleFactionTp(server, source, members, tx, ty, tz, safe, end, count);
+        }), 100, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
 }
+
+

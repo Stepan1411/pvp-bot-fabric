@@ -52,6 +52,11 @@ public class StatsReporter {
         }));
     }
 
+    public static void setBackendUrl(String url) {
+        backendUrl = url;
+        LOGGER.info("StatsReporter backend URL changed to {}", url);
+    }
+
     public static void addDamageDealt(float amount) {
         damageDealt += Math.round(amount);
     }

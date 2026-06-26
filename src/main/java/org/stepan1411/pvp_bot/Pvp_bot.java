@@ -108,7 +108,6 @@ public class Pvp_bot implements ModInitializer {
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-
             BotManager.updateBotData(server);
             BotManager.saveBots();
             BotManager.reset(server);
