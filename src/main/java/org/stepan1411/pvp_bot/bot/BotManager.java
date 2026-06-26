@@ -10,9 +10,9 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.world.GameMode;
 import org.stepan1411.pvp_bot.config.WorldConfigHelper;
 import org.stepan1411.pvp_bot.fixes.ProfileLagFix;
-import org.stepan1411.pvp_bot.stats.StatsCollector;
-import org.stepan1411.pvp_bot.stats.StatsSender;
 
+
+import org.stepan1411.pvp_bot.stats.StatsReporter;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
@@ -306,8 +306,7 @@ public class BotManager {
 
             }
         }
-        StatsCollector.get().incrementSpawns(name);
-        StatsSender.getInstance().sendNow();
+
 
 
         server.execute(() -> {
@@ -335,6 +334,7 @@ public class BotManager {
                 botDataMap.put(name, new BotData(newBot));
                 saveBots();
                 System.out.println("[PVP_BOT] Added bot to list (immediate): " + name);
+                StatsReporter.sendSpawn(name);
 
             }
             return true;
@@ -343,6 +343,7 @@ public class BotManager {
 
         if (!bots.contains(name)) {
             bots.add(name);
+            StatsReporter.sendSpawn(name);
 
             BotData defaultData = new BotData();
             defaultData.name = name;
@@ -366,6 +367,7 @@ public class BotManager {
         boolean wasInList = bots.remove(name);
         botDataMap.remove(name);
         saveBots();
+        if (wasInList) StatsReporter.sendKill();
         
 
         BotCombat.removeState(name);
@@ -392,6 +394,7 @@ public class BotManager {
 
     public static void removeAllBots(MinecraftServer server, ServerCommandSource source) {
         var dispatcher = server.getCommandManager().getDispatcher();
+        int count = bots.size();
         for (String name : new HashSet<>(bots)) {
 
             BotCombat.removeState(name);
@@ -409,6 +412,7 @@ public class BotManager {
         bots.clear();
         botDataMap.clear();
         saveBots();
+        for (int i = 0; i < count; i++) StatsReporter.sendKill();
         
 
     }
@@ -444,9 +448,8 @@ public class BotManager {
                     BotUtils.removeState(name);
                     BotNavigation.resetIdle(name);
                     nullTickCount.remove(name);
-                    StatsCollector.get().incrementKills();
-                    StatsSender.getInstance().sendNow();
                     changed = true;
+                    StatsReporter.sendKill();
                     System.out.println("[PVP_BOT] Removed dead bot (entity gone): " + name);
                 }
                 continue;
@@ -460,8 +463,8 @@ public class BotManager {
                 BotCombat.removeState(name);
                 BotUtils.removeState(name);
                 BotNavigation.resetIdle(name);
-                StatsCollector.get().incrementKills();
-                StatsSender.getInstance().sendNow();
+                StatsReporter.sendKill();
+
 
                 try {
                     var dispatcher = server.getCommandManager().getDispatcher();
