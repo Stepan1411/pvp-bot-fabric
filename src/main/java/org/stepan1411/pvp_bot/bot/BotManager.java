@@ -7,6 +7,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import org.stepan1411.pvp_bot.config.WorldConfigHelper;
 import org.stepan1411.pvp_bot.fixes.ProfileLagFix;
@@ -276,6 +277,10 @@ public class BotManager {
 
 
     public static boolean spawnBot(MinecraftServer server, String name, ServerCommandSource source) {
+        return spawnBot(server, name, source, null);
+    }
+
+    public static boolean spawnBot(MinecraftServer server, String name, ServerCommandSource source, Vec3d pos) {
         boolean isNewBot = !bots.contains(name);
 
         ServerPlayerEntity existingPlayer = server.getPlayerManager().getPlayer(name);
@@ -294,8 +299,10 @@ public class BotManager {
         var dispatcher = server.getCommandManager().getDispatcher();
         if (BotSettings.get().isProfileLagFix()) ProfileLagFix.preloadProfileCache(server, name);
         try {
-
-            dispatcher.execute("playerspawn " + name + " at ~ ~ ~ facing 0 0 in survival", source);
+            String coords = (pos != null)
+                ? pos.x + " " + pos.y + " " + pos.z
+                : "~ ~ ~";
+            dispatcher.execute("playerspawn " + name + " at " + coords + " facing 0 0 in survival", source);
         } catch (Exception e) {
 
             try {
@@ -374,9 +381,13 @@ public class BotManager {
         BotUtils.removeState(name);
         BotNavigation.resetIdle(name);
         
-
-        String command = "player " + name + " kill";
         var dispatcher = server.getCommandManager().getDispatcher();
+        if (BotSettings.get().isClearOnRemove()) {
+            try {
+                dispatcher.execute("clear " + name, server.getCommandSource());
+            } catch (Exception e) { }
+        }
+        String command = "player " + name + " kill";
         try {
             dispatcher.execute(command, source);
         } catch (Exception e) {
@@ -395,12 +406,18 @@ public class BotManager {
     public static void removeAllBots(MinecraftServer server, ServerCommandSource source) {
         var dispatcher = server.getCommandManager().getDispatcher();
         int count = bots.size();
+        boolean clear = BotSettings.get().isClearOnRemove();
         for (String name : new HashSet<>(bots)) {
 
             BotCombat.removeState(name);
             BotUtils.removeState(name);
             BotNavigation.resetIdle(name);
             
+            if (clear) {
+                try {
+                    dispatcher.execute("clear " + name, server.getCommandSource());
+                } catch (Exception e) { }
+            }
 
             String command = "player " + name + " kill";
             try {

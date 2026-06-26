@@ -82,6 +82,8 @@ public class BotSettings {
     private boolean rangedStrafeEnabled = true;
     private boolean rangedRetreatOnClose = true;
     private boolean profileLagFix = true;
+    private boolean safeSpawn = true;
+    private boolean clearOnRemove = true;
     
     public static final BotSettings DEFAULTS = new BotSettings();
     
@@ -387,6 +389,20 @@ public class BotSettings {
     }
     public void setProfileLagFix(boolean value) {
         this.profileLagFix = value;
+        save();
+    }
+
+    public boolean isSafeSpawn() { return safeSpawn; }
+
+    public void setSafeSpawn(boolean value) {
+        this.safeSpawn = value;
+        save();
+    }
+
+    public boolean isClearOnRemove() { return clearOnRemove; }
+
+    public void setClearOnRemove(boolean value) {
+        this.clearOnRemove = value;
         save();
     }
 }

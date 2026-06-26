@@ -12,6 +12,7 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.Vec3d;
 import org.stepan1411.pvp_bot.bot.BotCombat;
 import org.stepan1411.pvp_bot.bot.BotFaction;
@@ -372,6 +373,8 @@ public class BotCommand {
         settings.then(boolSetting("bot-leave-on-death", "Bot leaves on death", () -> BotSettings.get().isBotLeaveOnDeath(), v -> BotSettings.get().setBotLeaveOnDeath(v), BotSettings.DEFAULTS::isBotLeaveOnDeath));
         settings.then(boolSetting("attack-invincible", "Attack creative/spectator", () -> BotSettings.get().isAttackInvincible(), v -> BotSettings.get().setAttackInvincible(v), BotSettings.DEFAULTS::isAttackInvincible));
         settings.then(boolSetting("profile-lagg-fix", "Pre-populate profile cache to prevent lag on bot spawn", () -> BotSettings.get().isProfileLagFix(), v -> BotSettings.get().setProfileLagFix(v), BotSettings.DEFAULTS::isProfileLagFix));
+        settings.then(boolSetting("safe-spawn", "Spread mass-spawned bots to prevent entity cramming", () -> BotSettings.get().isSafeSpawn(), v -> BotSettings.get().setSafeSpawn(v), BotSettings.DEFAULTS::isSafeSpawn));
+        settings.then(boolSetting("clear-on-remove", "Clear bot inventory before remove/kill", () -> BotSettings.get().isClearOnRemove(), v -> BotSettings.get().setClearOnRemove(v), BotSettings.DEFAULTS::isClearOnRemove));
         settings.then(doubleSetting("aim-speed", "Aim rotation speed", () -> BotSettings.get().getAimSpeed(), v -> BotSettings.get().setAimSpeed(v), 3.0, 45.0, BotSettings.DEFAULTS::getAimSpeed));
         settings.then(doubleSetting("view-distance", "Max target acquisition range", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0, BotSettings.DEFAULTS::getMaxTargetDistance));
         settings.then(intSetting("max-mass-spawn", "Max bots per mass-spawn command", () -> BotSettings.get().getMaxMassSpawn(), v -> BotSettings.get().setMaxMassSpawn(v), 50, 10000, BotSettings.DEFAULTS::getMaxMassSpawn));
@@ -468,17 +471,31 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("Spawning " + count + " bots..."), false);
         int[] spawned = {0};
         int[] current = {0};
-        scheduleSpawn(server, source, count, spawned, current);
+        Vec3d basePos = null;
+        if (BotSettings.get().isSafeSpawn()) {
+            var player = source.getPlayer();
+            if (player != null) {
+                basePos = new Vec3d(player.getX(), player.getY(), player.getZ());
+            }
+        }
+        scheduleSpawn(server, source, count, spawned, current, basePos);
         return 1;
     }
 
-    private static void scheduleSpawn(net.minecraft.server.MinecraftServer server, ServerCommandSource source, int total, int[] spawned, int[] current) {
+    private static void scheduleSpawn(MinecraftServer server, ServerCommandSource source, int total, int[] spawned, int[] current, Vec3d basePos) {
         if (current[0] >= total) {
             source.sendFeedback(() -> Text.literal("Finished! Spawned " + spawned[0] + " bots."), true);
             return;
         }
         String name = BotNameGenerator.generateUniqueName();
-        if (BotManager.spawnBot(server, name, source)) {
+        Vec3d spawnPos = null;
+        if (basePos != null) {
+            var rng = java.util.concurrent.ThreadLocalRandom.current();
+            double dx = (rng.nextDouble() * 0.4 + 0.1) * (rng.nextBoolean() ? 1 : -1);
+            double dz = (rng.nextDouble() * 0.4 + 0.1) * (rng.nextBoolean() ? 1 : -1);
+            spawnPos = new Vec3d(basePos.x + dx, basePos.y, basePos.z + dz);
+        }
+        if (BotManager.spawnBot(server, name, source, spawnPos)) {
             spawned[0]++;
         }
         current[0]++;
@@ -491,7 +508,7 @@ public class BotCommand {
                     if (delay[0] < 5) {
                         server.execute(this);
                     } else {
-                        scheduleSpawn(server, source, total, spawned, current);
+                        scheduleSpawn(server, source, total, spawned, current, basePos);
                     }
                 }
             });
