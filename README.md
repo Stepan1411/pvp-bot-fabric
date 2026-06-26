@@ -153,6 +153,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot settings view-distance <5-128>           - Target search range
 /pvpbot settings max-mass-spawn <50-10000>       - Max bots per mass-spawn
 /pvpbot settings profile-lagg-fix [true/false]   - Prevent lag on bot spawn
+```
 
 ### Ranged Combat Settings
 ```
@@ -189,7 +190,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot faction path start <faction> <path>   - Start path
 /pvpbot faction path stop <faction>           - Stop path
 /pvpbot faction tp <faction> <x y z|player>   - Teleport entire faction gradually
-
+```
 ### Faction Kit Commands
 ```
 /pvpbot faction kit give-kit <faction> <kit>      - Give kit to all members
@@ -231,11 +232,6 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
  - Bots in battle
 <img width="1920" height="1009" alt="2026-02-04_22 48 36" src="https://github.com/user-attachments/assets/168fd083-5157-491b-a129-fb256f351681" />
 
- - Settings GUI
-<img width="205" height="201" alt="изображение" src="https://github.com/user-attachments/assets/bba55564-ac0d-4b49-af04-076da8c97df1" />
-<img width="525" height="380" alt="изображение" src="https://github.com/user-attachments/assets/389e15c0-ae95-4a51-b3d5-901424bbad63" />
-<img width="525" height="381" alt="изображение" src="https://github.com/user-attachments/assets/acac0102-aeb5-4ca1-98e2-fb71925effb7" />
-
  - Faction system
 <img width="1920" height="1009" alt="изображение" src="https://github.com/user-attachments/assets/a11d896f-f454-4333-a4b0-cf328ff9f437" />
 <img width="1920" height="1009" alt="изображение" src="https://github.com/user-attachments/assets/06d4bf94-824d-4307-b463-bf8e4de0fd4e" />
@@ -245,7 +241,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 <img width="1920" height="1009" alt="изображение" src="https://github.com/user-attachments/assets/522a5072-5a28-4e60-abd3-53a183039a1c" />
 
 - Mass bot spawn
-<img width="1691" height="888" alt="изображение" src="https://github.com/user-attachments/assets/ecfcd7c4-f430-4765-8391-09d3d4761cb6" />
+- <img width="1691" height="888" alt="image" src="https://github.com/user-attachments/assets/fb37dc89-0eff-45be-81f4-82edd1135076" />
 
 - Path system in action
 <img width="1920" height="1009" alt="изображение" src="https://github.com/user-attachments/assets/1e609988-78b7-4261-a831-75587380b270" />
@@ -257,7 +253,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **Modrinth**: https://modrinth.com/mod/pvp-bot-fabric
 - **GitHub**: https://github.com/Stepan1411/pvp-bot-fabric
 - **Issues**: https://github.com/Stepan1411/pvp-bot-fabric/issues
-- **Wiki**: https://github.com/Stepan1411/pvp-bot-fabric/wiki
+- **Wiki**: https://stepan1411.github.io/pvpbot-docs.html
 - **Live Stats Dashboard**: http://pvpbotstats.survivalworld.win/
 
 **Have a nice pvp! 🎮**
