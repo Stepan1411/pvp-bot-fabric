@@ -190,7 +190,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot faction path start <faction> <path>   - Start path
 /pvpbot faction path stop <faction>           - Stop path
 /pvpbot faction tp <faction> <x y z|player>   - Teleport entire faction gradually
-
+```
 ### Faction Kit Commands
 ```
 /pvpbot faction kit give-kit <faction> <kit>      - Give kit to all members
