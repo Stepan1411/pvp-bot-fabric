@@ -206,6 +206,11 @@ public class BotCommand {
                         .executes(ctx -> kitGiveNear(ctx, 10.0))
                         .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1, 1000))
                             .executes(ctx -> kitGiveNear(ctx, DoubleArgumentType.getDouble(ctx, "radius"))))))
+                .then(cmd("give-kit-near-random", "Give random kit to bots within radius")
+                    .then(CommandManager.argument("radius", DoubleArgumentType.doubleArg(1, 1000))
+                        .then(CommandManager.argument("kits", StringArgumentType.greedyString())
+                            .suggests(RANDOM_KIT_SUGGESTIONS)
+                            .executes(BotCommand::kitGiveNearRandom))))
                 .then(cmd("kits", "List all kits")
                     .executes(BotCommand::kitList)))
 
@@ -262,17 +267,18 @@ public class BotCommand {
                     .then(cmd("stop", "Stop faction on path")
                         .then(CommandManager.argument("faction", StringArgumentType.word())
                             .executes(BotCommand::factionStopPath))))
-                .then(cmd("give-kit", "Give kit to faction")
-                    .then(CommandManager.argument("faction", StringArgumentType.word())
-                        .then(CommandManager.argument("kitname", StringArgumentType.word())
-                            .suggests(KIT_SUGGESTIONS)
-                            .executes(BotCommand::factionGiveKit))))
-                .then(cmd("give-kit-random", "Give random kit to faction by percentage")
-                    .then(CommandManager.argument("faction", StringArgumentType.word())
-                        .suggests(FACTION_SUGGESTIONS)
-                        .then(CommandManager.argument("kits", StringArgumentType.greedyString())
-                            .suggests(RANDOM_KIT_SUGGESTIONS)
-                            .executes(BotCommand::factionGiveKitRandom)))))
+                .then(cmd("kit", "Faction kit management")
+                    .then(cmd("give-kit", "Give kit to faction")
+                        .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .then(CommandManager.argument("kitname", StringArgumentType.word())
+                                .suggests(KIT_SUGGESTIONS)
+                                .executes(BotCommand::factionGiveKit))))
+                    .then(cmd("give-kit-random", "Give random kit to faction by percentage")
+                        .then(CommandManager.argument("faction", StringArgumentType.word())
+                            .suggests(FACTION_SUGGESTIONS)
+                            .then(CommandManager.argument("kits", StringArgumentType.greedyString())
+                                .suggests(RANDOM_KIT_SUGGESTIONS)
+                                .executes(BotCommand::factionGiveKitRandom))))))
 
         );
     }
@@ -1342,6 +1348,77 @@ public class BotCommand {
         if (count > 0) {
             int finalCount = count;
             source.sendFeedback(() -> Text.literal("Gave kit '" + kitname + "' to " + finalCount + " bots within " + radius + " blocks"), true);
+            return count;
+        } else {
+            source.sendError(Text.literal("No bots found within " + radius + " blocks"));
+            return 0;
+        }
+    }
+
+    // ========== GIVE-KIT-NEAR-RANDOM ==========
+
+    private static int kitGiveNearRandom(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        double radius = DoubleArgumentType.getDouble(ctx, "radius");
+        String kitsArg = StringArgumentType.getString(ctx, "kits");
+        var player = source.getPlayer();
+        if (player == null) {
+            source.sendError(Text.literal("This command must be run by a player!"));
+            return 0;
+        }
+        String[] parts = kitsArg.split(" ");
+        if (parts.length < 2 || parts.length % 2 != 0) {
+            source.sendError(Text.literal("Usage: /pvpbot kit give-kit-near-random <radius> <kit> <weight>% [<kit> <weight>% ...]"));
+            return 0;
+        }
+        java.util.LinkedHashMap<String, Integer> weights = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < parts.length; i += 2) {
+            String kitName = parts[i];
+            String weightStr = parts[i + 1];
+            if (!weightStr.endsWith("%")) {
+                source.sendError(Text.literal("Invalid weight '" + weightStr + "' for kit '" + kitName + "'. Use format: <weight>%"));
+                return 0;
+            }
+            if (!BotKits.kitExists(kitName)) {
+                source.sendError(Text.literal("Kit '" + kitName + "' not found!"));
+                return 0;
+            }
+            try {
+                int w = Integer.parseInt(weightStr.substring(0, weightStr.length() - 1));
+                if (w <= 0) {
+                    source.sendError(Text.literal("Weight must be positive for kit '" + kitName + "'"));
+                    return 0;
+                }
+                weights.put(kitName, w);
+            } catch (NumberFormatException e) {
+                source.sendError(Text.literal("Invalid weight '" + weightStr + "' for kit '" + kitName + "'"));
+                return 0;
+            }
+        }
+        int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
+        var server = source.getServer();
+        int count = 0;
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        for (String botName : BotManager.getAllBots()) {
+            ServerPlayerEntity bot = server.getPlayerManager().getPlayer(botName);
+            if (bot == null || bot.distanceTo(player) > radius) continue;
+            int roll = rng.nextInt(totalWeight);
+            int cumulative = 0;
+            String selected = null;
+            for (var entry : weights.entrySet()) {
+                cumulative += entry.getValue();
+                if (roll < cumulative) {
+                    selected = entry.getKey();
+                    break;
+                }
+            }
+            if (selected != null && BotKits.giveKit(selected, bot)) {
+                count++;
+            }
+        }
+        if (count > 0) {
+            int finalCount = count;
+            source.sendFeedback(() -> Text.literal("Gave random kits to " + finalCount + " bots within " + radius + " blocks"), true);
             return count;
         } else {
             source.sendError(Text.literal("No bots found within " + radius + " blocks"));
