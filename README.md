@@ -153,6 +153,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot settings view-distance <5-128>           - Target search range
 /pvpbot settings max-mass-spawn <50-10000>       - Max bots per mass-spawn
 /pvpbot settings profile-lagg-fix [true/false]   - Prevent lag on bot spawn
+```
 
 ### Ranged Combat Settings
 ```
