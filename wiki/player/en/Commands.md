@@ -61,6 +61,8 @@ See [Paths](Paths) for detailed usage.
 | `/pvpbot kit delete-kit <name>` | Delete a kit |
 | `/pvpbot kit give-kit <player> <kitname>` | Give kit to player/bot |
 | `/pvpbot kit kits` | List all kits |
+| `/pvpbot kit give-kit-near <kitname> [radius]` | Give kit to bots within radius (default: 10) |
+| `/pvpbot kit give-kit-near-random <radius> <kit1> <w1>% [<kit2> <w2>% ...]` | Give random weighted kit to bots within radius |
 
 See [Kits](Kits) for detailed usage.
 
@@ -81,6 +83,13 @@ See [Kits](Kits) for detailed usage.
 | `/pvpbot faction attack <faction> <target>` | All members attack target |
 | `/pvpbot faction path start <faction> <path>` | All members follow path |
 | `/pvpbot faction path stop <faction>` | Stop all members on path |
-| `/pvpbot faction give-kit <faction> <kitname>` | Give kit to all members |
+| `/pvpbot faction tp <faction> <x y z\|player>` | Teleport entire faction gradually |
+
+### Faction Kit Commands
+
+| Command | Description |
+|---------|-------------|
+| `/pvpbot faction kit give-kit <faction> <kitname>` | Give kit to all members |
+| `/pvpbot faction kit give-kit-random <faction> <kit1> <w1>% [<kit2> <w2>% ...]` | Give random weighted kit to faction members |
 
 See [Factions](Factions) for detailed usage.

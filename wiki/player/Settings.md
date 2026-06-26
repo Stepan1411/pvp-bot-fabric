@@ -35,11 +35,12 @@ All settings are saved per-world in `config/pvpbot/worlds/<worldname>/settings.j
 | attack-invincible | bool | false | - | Attack creative/spectator players |
 | attack-cooldown | int | 10 | 1 - 40 | Ticks between attacks |
 | criticals | bool | true | - | Jump for critical hits |
+| crit-fall-ticks | int | 6 | 1 - 10 | Falling ticks required for crit |
 | melee-range | double | 3.5 | 2.0 - 6.0 | Melee reach distance |
 | move-speed | double | 1.0 | 0.1 - 2.0 | Movement speed multiplier |
 | miss-chance | int | 0 | 0 - 100 | % chance to miss attacks |
 | mistake-chance | int | 0 | 0 - 100 | % chance to aim incorrectly |
-| aim-speed | double | 60.0 | 3.0 - 90.0 | Rotation speed (deg/sec) |
+| aim-speed | double | 90.0 | 3.0 - 90.0 | Rotation speed (deg/sec) |
 
 ## Weapon Settings
 
@@ -53,12 +54,21 @@ All settings are saved per-world in `config/pvpbot/worlds/<worldname>/settings.j
 | prefer-sword | bool | true | - | Prefer swords over axes |
 | shield-mace | bool | true | - | Auto-shield against mace attacks |
 | special-names | bool | false | - | Use special names list |
-| bow-min-draw | int | 15 | 5 - 30 | Min bow draw ticks |
 | mace-range | double | 6.0 | 3.0 - 10.0 | Mace attack range |
 | spear-range | double | 4.5 | 2.0 - 8.0 | Spear attack range |
 | spear-charge-range | double | 12.0 | 5.0 - 20.0 | Spear charge start range |
-| ranged-min-range | double | 8.0 | 3.0 - 20.0 | Min ranged engagement distance |
-| ranged-optimal | double | 20.0 | 10.0 - 50.0 | Optimal ranged distance |
+
+### Ranged Combat
+
+| Setting | Type | Default | Range | Description |
+|---------|------|---------|-------|-------------|
+| bow-draw-ticks | int | 40 | 5 - 100 | Bow full draw time (ticks) |
+| ranged-min-range | double | 20.0 | 3.0 - 20.0 | Min bow engagement distance |
+| ranged-optimal-range | double | 40.0 | 10.0 - 50.0 | Ideal bow distance |
+| ranged-max-range | double | 60.0 | 15.0 - 100.0 | Max bow engagement range |
+| arrow-prediction | bool | true | - | Predictive bow aiming at moving targets |
+| ranged-strafe | bool | true | - | Strafe sideways while shooting bow |
+| ranged-retreat | bool | true | - | Retreat when target gets close |
 
 ## Utility Settings
 
@@ -89,7 +99,7 @@ All settings are saved per-world in `config/pvpbot/worlds/<worldname>/settings.j
 | Setting | Type | Default | Range | Description |
 |---------|------|---------|-------|-------------|
 | shield-hold-ticks | int | 60 | 10 - 200 | Ticks to hold shield raised |
-| shield-raise-ticks | int | 12 | 2 - 40 | Ticks to raise shield |
+| shield-raise-ticks | int | 12 | 2 - 40 | Ticks to raise shield before predicted hit |
 | shield-break-chance | int | 40 | 0 - 100 | % chance to break enemy shield per hit |
 
 ## Navigation Settings
@@ -114,3 +124,7 @@ All settings are saved per-world in `config/pvpbot/worlds/<worldname>/settings.j
 | bot-leave-on-death | bool | true | - | Remove bot on death |
 | attack-invincible | bool | false | - | Attack in creative/spectator |
 | bots-relogs | bool | true | - | Restore bots on server restart |
+| safe-spawn | bool | true | - | Random offset (±0.1-0.5 blocks) on spawn to prevent suffocation |
+| clear-on-remove | bool | true | - | Clear inventory before removing bot |
+| profile-lagg-fix | bool | true | - | Pre-populate profile cache to prevent lag on bot spawn |
+| max-mass-spawn | int | 1000 | 50 - 10000 | Max bots allowed per mass-spawn command |

@@ -71,6 +71,16 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **Mistake Chance** - attack wrong direction
 - **Shield Break Chance**
 
+### 📊 Live Stats Dashboard
+- **Real-time bot statistics** — total spawns, kills, damage, active bots
+- **Live graphs** — server activity history with downsampling (500 points max)
+- **Top names** — most frequently spawned bot names
+- **All-time records** — max online servers and max active bots
+- **Server-Sent Events** — instant dashboard updates
+- **History stored in DuckDB** — efficient time-series storage, 30-day retention
+- **Backend** — standalone Velocity plugin with embedded HTTP server
+- **Dashboard URL**: [http://pvpbotstats.survivalworld.win/](http://pvpbotstats.survivalworld.win/)
+
 ---
 
 ## 📋 Commands
@@ -134,9 +144,33 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot settings miss-chance <0-100>         - Miss chance (%)
 /pvpbot settings mistake-chance <0-100>      - Mistake chance (%)
 /pvpbot settings aim-speed <3-45>            - Rotation speed
-/pvpbot settings special-names [true/false]  - Use special names
+/pvpbot settings special-names [true/false]      - Use special names
 /pvpbot settings bot-leave-on-death [true/false] - Remove on death
-/pvpbot settings attack-invincible [true/false]  - Attack creative players
+/pvpbot settings attack-invincible [true/false]  - Attack creative/spectator
+/pvpbot settings safe-spawn [true/false]         - Random offset on spawn
+/pvpbot settings clear-on-remove [true/false]    - Clear inventory on kill
+/pvpbot settings shield-mace [true/false]        - Raise shield vs mace
+/pvpbot settings view-distance <5-128>           - Target search range
+/pvpbot settings max-mass-spawn <50-10000>       - Max bots per mass-spawn
+/pvpbot settings profile-lagg-fix [true/false]   - Prevent lag on bot spawn
+
+### Ranged Combat Settings
+```
+/pvpbot settings ranged-min-range <3.0-20.0>     - Min bow distance
+/pvpbot settings ranged-optimal-range <10.0-50.0> - Ideal bow distance
+/pvpbot settings ranged-max-range <15.0-100.0>   - Max bow engagement range
+/pvpbot settings bow-draw-ticks <5-100>           - Bow full draw time
+/pvpbot settings arrow-prediction [true/false]    - Predictive bow aiming
+/pvpbot settings ranged-strafe [true/false]       - Strafe while shooting bow
+/pvpbot settings ranged-retreat [true/false]      - Retreat with bow when close
+```
+
+### Critical & Misc Settings
+```
+/pvpbot settings crit-fall-ticks <1-10>          - Falling ticks for crit
+/pvpbot settings shield-hold-ticks <10-200>      - Max shield hold ticks
+/pvpbot settings shield-raise-ticks <2-40>       - Shield raise anticipation
+/pvpbot settings aim-speed <3.0-90.0>            - Rotation speed
 ```
 
 ### Faction Commands
@@ -152,17 +186,24 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot faction hostile <f1> <f2> [true/false] - Set hostile
 /pvpbot faction attack <faction> <target>     - All bots attack
 /pvpbot faction give <faction> <item>         - Give item to all
-/pvpbot faction give-kit <faction> <kit>      - Give kit to all
 /pvpbot faction path start <faction> <path>   - Start path
 /pvpbot faction path stop <faction>           - Stop path
+/pvpbot faction tp <faction> <x y z|player>   - Teleport entire faction gradually
+
+### Faction Kit Commands
+```
+/pvpbot faction kit give-kit <faction> <kit>      - Give kit to all members
+/pvpbot faction kit give-kit-random <faction> <kit1> <w1>% [<kit2> <w2>% ...] - Give random weighted kit
 ```
 
 ### Kit Commands
 ```
-/pvpbot kit create-kit <name>            - Create a kit from your inventory
-/pvpbot kit delete-kit <name>            - Delete a kit
-/pvpbot kit kits                         - List all kits
-/pvpbot kit give-kit <player> <kit>      - Give kit to a player/bot
+/pvpbot kit create-kit <name>                         - Create a kit from your inventory
+/pvpbot kit delete-kit <name>                         - Delete a kit
+/pvpbot kit kits                                      - List all kits
+/pvpbot kit give-kit <player> <kit>                   - Give kit to a player/bot
+/pvpbot kit give-kit-near <kit> [radius]              - Give kit to nearby bots
+/pvpbot kit give-kit-near-random <radius> <kit1> <w1>% [<kit2> <w2>% ...] - Give random weighted kit to bots within radius
 ```
 
 ### Path Commands
@@ -217,5 +258,6 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **GitHub**: https://github.com/Stepan1411/pvp-bot-fabric
 - **Issues**: https://github.com/Stepan1411/pvp-bot-fabric/issues
 - **Wiki**: https://github.com/Stepan1411/pvp-bot-fabric/wiki
+- **Live Stats Dashboard**: http://pvpbotstats.survivalworld.win/
 
 **Have a nice pvp! 🎮**

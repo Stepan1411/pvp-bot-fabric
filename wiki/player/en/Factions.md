@@ -52,8 +52,26 @@ Give items to all faction members:
 ### Give Kit
 Equip all members with a kit:
 ```
-/pvpbot faction give-kit Red MyKit
+/pvpbot faction kit give-kit Red MyKit
 ```
+
+### Give Random Kit
+Equip faction members with a random weighted kit:
+```
+/pvpbot faction kit give-kit-random Red warrior 60% archer 30% mage 10%
+```
+
+Each member gets one kit based on the weight distribution.
+
+### Teleport
+Teleport entire faction gradually (5 bots per 100ms):
+```
+/pvpbot faction tp Red 100 64 -200
+/pvpbot faction tp Red ~ ~ ~
+/pvpbot faction tp Red PlayerName
+```
+
+Supports absolute coordinates, relative `~`, or targeting a player/bot by name.
 
 ### Path Following
 All members follow a path:
