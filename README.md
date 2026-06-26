@@ -253,7 +253,7 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **Modrinth**: https://modrinth.com/mod/pvp-bot-fabric
 - **GitHub**: https://github.com/Stepan1411/pvp-bot-fabric
 - **Issues**: https://github.com/Stepan1411/pvp-bot-fabric/issues
-- **Wiki**: https://github.com/Stepan1411/pvp-bot-fabric/wiki
+- **Wiki**: https://stepan1411.github.io/pvpbot-docs.html
 - **Live Stats Dashboard**: http://pvpbotstats.survivalworld.win/
 
 **Have a nice pvp! 🎮**
