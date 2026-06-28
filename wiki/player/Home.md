@@ -39,16 +39,6 @@ PVP Bot is a Minecraft Fabric mod that adds intelligent combat bots powered by H
 /pvpbot spawn MyBot
 ```
 
-### Enable Crystal PVP
-```
-/pvpbot settings crystal-pvp true
-```
-
-### Enable ElytraMace trick
-```
-/pvpbot settings elytra-mace true
-```
-
 ### Make two teams fight
 ```
 /pvpbot spawn Red1

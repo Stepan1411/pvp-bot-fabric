@@ -99,7 +99,7 @@ All settings are saved per-world in `config/pvpbot/worlds/<worldname>/settings.j
 | Setting | Type | Default | Range | Description |
 |---------|------|---------|-------|-------------|
 | shield-hold-ticks | int | 60 | 10 - 200 | Ticks to hold shield raised |
-| shield-raise-ticks | int | 12 | 2 - 40 | Ticks to raise shield |
+| shield-raise-ticks | int | 12 | 2 - 40 | Ticks to raise shield before predicted hit |
 | shield-break-chance | int | 40 | 0 - 100 | % chance to break enemy shield per hit |
 
 ## Navigation Settings
