@@ -281,6 +281,15 @@ public class BotManager {
     }
 
     public static boolean spawnBot(MinecraftServer server, String name, ServerCommandSource source, Vec3d pos) {
+        // Minecraft player names are limited to 16 characters; a longer name crashes the
+        // player-info packet encoder, so refuse to spawn (or restore) such bots.
+        if (name == null || name.isEmpty() || name.length() > 16) {
+            System.out.println("[PVP_BOT] Skipping bot with invalid name (must be 1-16 chars): " + name);
+            bots.remove(name);
+            botDataMap.remove(name);
+            return false;
+        }
+
         boolean isNewBot = !bots.contains(name);
 
         ServerPlayerEntity existingPlayer = server.getPlayerManager().getPlayer(name);

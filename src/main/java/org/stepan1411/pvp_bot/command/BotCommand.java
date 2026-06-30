@@ -507,6 +507,10 @@ public class BotCommand {
 
     private static int spawn(CommandContext<ServerCommandSource> ctx, String name) {
         var source = ctx.getSource();
+        if (name != null && name.length() > 16) {
+            source.sendError(Text.literal("Bot name '" + name + "' is too long (" + name.length() + " characters). Minecraft names are limited to 16 characters."));
+            return 0;
+        }
         String botName = name != null ? name : BotNameGenerator.generateUniqueName();
         var server = source.getServer();
         var existingPlayer = server.getPlayerManager().getPlayer(botName);
