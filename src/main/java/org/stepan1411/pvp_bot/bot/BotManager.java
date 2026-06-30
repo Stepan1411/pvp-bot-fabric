@@ -101,6 +101,15 @@ public class BotManager {
         String[] names = botsToRestore.keySet().toArray(new String[0]);
         if (index < names.length) {
             String name = names[index];
+            if (!isValidBotName(name)) {
+                System.out.println("[PVP_BOT] Skipping restore of bot with invalid name (must be 1-16 chars): " + name);
+                bots.remove(name);
+                botDataMap.remove(name);
+                saveBots();
+                final int nextIndex = index + 1;
+                server.execute(() -> restoreBotsDelayedWithRetry(server, botsToRestore, nextIndex, 0));
+                return;
+            }
             BotData data = botsToRestore.get(name);
             ServerPlayerEntity existingPlayer = server.getPlayerManager().getPlayer(name);
             if (existingPlayer != null && !bots.contains(name)) {
@@ -234,8 +243,17 @@ public class BotManager {
         try (Reader reader = Files.newBufferedReader(savePath)) {
             Map<String, BotData> loaded = GSON.fromJson(reader, new TypeToken<Map<String, BotData>>(){}.getType());
             if (loaded != null) {
-                botDataMap.putAll(loaded);
-                bots.addAll(loaded.keySet());
+                boolean droppedInvalid = false;
+                for (var entry : loaded.entrySet()) {
+                    if (!isValidBotName(entry.getKey())) {
+                        System.out.println("[PVP_BOT] Dropping saved bot with invalid name (must be 1-16 chars): " + entry.getKey());
+                        droppedInvalid = true;
+                        continue;
+                    }
+                    botDataMap.put(entry.getKey(), entry.getValue());
+                    bots.add(entry.getKey());
+                }
+                if (droppedInvalid) saveBots();
             }
         } catch (Exception e) {
             System.out.println("[PVP_BOT] Failed to load bots: " + e.getMessage());
@@ -280,10 +298,17 @@ public class BotManager {
         return spawnBot(server, name, source, null);
     }
 
+    /**
+     * Minecraft player names are limited to 16 characters; a longer name crashes the
+     * player-info packet encoder when the bot is added to the tab list. Used to refuse
+     * spawning or restoring such bots.
+     */
+    public static boolean isValidBotName(String name) {
+        return name != null && !name.isEmpty() && name.length() <= 16;
+    }
+
     public static boolean spawnBot(MinecraftServer server, String name, ServerCommandSource source, Vec3d pos) {
-        // Minecraft player names are limited to 16 characters; a longer name crashes the
-        // player-info packet encoder, so refuse to spawn (or restore) such bots.
-        if (name == null || name.isEmpty() || name.length() > 16) {
+        if (!isValidBotName(name)) {
             System.out.println("[PVP_BOT] Skipping bot with invalid name (must be 1-16 chars): " + name);
             bots.remove(name);
             botDataMap.remove(name);
