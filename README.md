@@ -58,6 +58,11 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 - **Giving kits** to bots and factions
 - **Saving kits** across restarts
 
+### ⚙️ Settings Presets
+- **Save** the entire settings configuration under a name
+- **Load** any preset at any time for quick setup
+- **Reusable** across worlds and saved across restarts
+
 ### 🛤️ Path System
 - **Create paths** for bots to follow
 - **Add waypoints** to paths
@@ -153,6 +158,14 @@ This mod adds bots to the server with advanced combat AI, a faction system, auto
 /pvpbot settings view-distance <5-128>           - Target search range
 /pvpbot settings max-mass-spawn <50-10000>       - Max bots per mass-spawn
 /pvpbot settings profile-lagg-fix [true/false]   - Prevent lag on bot spawn
+```
+
+### Settings Presets
+```
+/pvpbot settings preset save <name>    - Save the current settings as a named preset
+/pvpbot settings preset load <name>    - Apply a saved preset to the current settings
+/pvpbot settings preset delete <name>  - Delete a settings preset
+/pvpbot settings preset list           - List all saved settings presets
 ```
 
 ### Ranged Combat Settings

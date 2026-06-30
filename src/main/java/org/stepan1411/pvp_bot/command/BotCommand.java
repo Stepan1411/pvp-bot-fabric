@@ -20,6 +20,7 @@ import org.stepan1411.pvp_bot.bot.BotKits;
 import org.stepan1411.pvp_bot.bot.BotManager;
 import org.stepan1411.pvp_bot.bot.BotNameGenerator;
 import org.stepan1411.pvp_bot.bot.BotPath;
+import org.stepan1411.pvp_bot.bot.BotPresets;
 import org.stepan1411.pvp_bot.bot.BotSettings;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -43,6 +44,17 @@ public class BotCommand {
             for (String kit : BotKits.getKitNames()) {
                 if (kit.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
                     builder.suggest(kit);
+                }
+            }
+            return builder.buildFuture();
+        };
+
+    private static final SuggestionProvider<ServerCommandSource> PRESET_SUGGESTIONS =
+        (ctx, builder) -> {
+            String remaining = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
+            for (String preset : BotPresets.getPresetNames()) {
+                if (preset.toLowerCase(java.util.Locale.ROOT).contains(remaining)) {
+                    builder.suggest(preset);
                 }
             }
             return builder.buildFuture();
@@ -411,6 +423,23 @@ public class BotCommand {
         settings.then(doubleSetting("view-distance", "Max target acquisition range", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0, BotSettings.DEFAULTS::getMaxTargetDistance));
         settings.then(intSetting("max-mass-spawn", "Max bots per mass-spawn command", () -> BotSettings.get().getMaxMassSpawn(), v -> BotSettings.get().setMaxMassSpawn(v), 50, 10000, BotSettings.DEFAULTS::getMaxMassSpawn));
 
+        // ========== SETTINGS PRESETS ==========
+        settings.then(cmd("preset", "Save/load settings presets")
+            .then(cmd("save", "Save current settings as a preset")
+                .then(CommandManager.argument("name", StringArgumentType.word())
+                    .suggests(PRESET_SUGGESTIONS)
+                    .executes(BotCommand::presetSave)))
+            .then(cmd("load", "Apply a saved settings preset")
+                .then(CommandManager.argument("name", StringArgumentType.word())
+                    .suggests(PRESET_SUGGESTIONS)
+                    .executes(BotCommand::presetLoad)))
+            .then(cmd("delete", "Delete a settings preset")
+                .then(CommandManager.argument("name", StringArgumentType.word())
+                    .suggests(PRESET_SUGGESTIONS)
+                    .executes(BotCommand::presetDelete)))
+            .then(cmd("list", "List all settings presets")
+                .executes(BotCommand::presetList)));
+
         return settings;
     }
 
@@ -575,6 +604,7 @@ public class BotCommand {
         var server = source.getServer();
         BotSettings.load();
         BotKits.reload(server);
+        BotPresets.reload(server);
         BotPath.init();
         BotManager.reloadBots();
         source.sendFeedback(() -> Text.literal("All configurations reloaded!"), true);
@@ -1090,6 +1120,60 @@ public class BotCommand {
             source.sendFeedback(() -> Text.literal("No kits created. Use /pvpbot kit create-kit <name> to create one."), false);
         } else {
             source.sendFeedback(() -> Text.literal("Kits (" + kits.size() + "): " + String.join(", ", kits)), false);
+        }
+        return 1;
+    }
+
+    private static int presetSave(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        boolean existed = BotPresets.presetExists(name);
+        if (BotPresets.savePreset(name)) {
+            source.sendFeedback(() -> Text.literal(existed
+                ? "Settings preset '" + name + "' updated with current settings!"
+                : "Settings preset '" + name + "' saved from current settings!"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Failed to save settings preset '" + name + "'"));
+            return 0;
+        }
+    }
+
+    private static int presetLoad(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (!BotPresets.presetExists(name)) {
+            source.sendError(Text.literal("Settings preset '" + name + "' not found!"));
+            return 0;
+        }
+        if (BotPresets.loadPreset(name)) {
+            source.sendFeedback(() -> Text.literal("Loaded settings preset '" + name + "'. Use /pvpbot settings to review."), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Failed to load settings preset '" + name + "'"));
+            return 0;
+        }
+    }
+
+    private static int presetDelete(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        String name = StringArgumentType.getString(ctx, "name");
+        if (BotPresets.deletePreset(name)) {
+            source.sendFeedback(() -> Text.literal("Settings preset '" + name + "' deleted!"), true);
+            return 1;
+        } else {
+            source.sendError(Text.literal("Settings preset '" + name + "' not found!"));
+            return 0;
+        }
+    }
+
+    private static int presetList(CommandContext<ServerCommandSource> ctx) {
+        var source = ctx.getSource();
+        var presets = BotPresets.getPresetNames();
+        if (presets.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("No settings presets saved. Use /pvpbot settings preset save <name> to create one."), false);
+        } else {
+            source.sendFeedback(() -> Text.literal("Settings presets (" + presets.size() + "): " + String.join(", ", presets)), false);
         }
         return 1;
     }
