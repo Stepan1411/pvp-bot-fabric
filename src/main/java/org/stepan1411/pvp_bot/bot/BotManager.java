@@ -298,11 +298,6 @@ public class BotManager {
         return spawnBot(server, name, source, null);
     }
 
-    /**
-     * Minecraft player names are limited to 16 characters; a longer name crashes the
-     * player-info packet encoder when the bot is added to the tab list. Used to refuse
-     * spawning or restoring such bots.
-     */
     public static boolean isValidBotName(String name) {
         return name != null && !name.isEmpty() && name.length() <= 16;
     }

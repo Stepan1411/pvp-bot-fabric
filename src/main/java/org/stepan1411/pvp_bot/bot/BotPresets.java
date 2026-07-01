@@ -17,19 +17,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Settings presets: named snapshots of the full {@link BotSettings} state that can be
- * saved and re-applied at any time, like the kit system but for settings.
- *
- * Each preset is stored as a JSON snapshot of every setting field. Presets live in the
- * global config dir (shared across worlds) so a setup can be reused anywhere.
- */
 public class BotPresets {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static Path configPath;
 
-    // presetName (lowercase) -> full settings snapshot
     private static final Map<String, JsonElement> presets = new HashMap<>();
 
     public static void init(MinecraftServer srv) {
@@ -49,10 +41,6 @@ public class BotPresets {
         load();
     }
 
-    /**
-     * Save the current settings under the given preset name. Overwrites an existing
-     * preset with the same name.
-     */
     public static boolean savePreset(String presetName) {
         String key = presetName.toLowerCase();
         presets.put(key, BotSettings.exportJson());
@@ -60,10 +48,6 @@ public class BotPresets {
         return true;
     }
 
-    /**
-     * Apply a saved preset to the current settings. Returns false if the preset does
-     * not exist or could not be applied.
-     */
     public static boolean loadPreset(String presetName) {
         JsonElement snapshot = presets.get(presetName.toLowerCase());
         if (snapshot == null) return false;

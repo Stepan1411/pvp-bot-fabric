@@ -423,7 +423,6 @@ public class BotCommand {
         settings.then(doubleSetting("view-distance", "Max target acquisition range", () -> BotSettings.get().getMaxTargetDistance(), v -> BotSettings.get().setMaxTargetDistance(v), 5.0, 128.0, BotSettings.DEFAULTS::getMaxTargetDistance));
         settings.then(intSetting("max-mass-spawn", "Max bots per mass-spawn command", () -> BotSettings.get().getMaxMassSpawn(), v -> BotSettings.get().setMaxMassSpawn(v), 50, 10000, BotSettings.DEFAULTS::getMaxMassSpawn));
 
-        // ========== SETTINGS PRESETS ==========
         settings.then(cmd("preset", "Save/load settings presets")
             .then(cmd("save", "Save current settings as a preset")
                 .then(CommandManager.argument("name", StringArgumentType.word())

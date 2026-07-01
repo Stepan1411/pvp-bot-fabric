@@ -132,18 +132,10 @@ public class BotSettings {
         }
     }
 
-    /**
-     * Snapshot the current settings as a JSON tree, used by the preset system.
-     */
     public static com.google.gson.JsonElement exportJson() {
         return GSON.toJsonTree(get());
     }
 
-    /**
-     * Replace the current settings with the values from a JSON tree (e.g. a saved
-     * preset) and persist them. Fields missing from the tree keep their defaults.
-     * Returns false if the tree could not be parsed.
-     */
     public static boolean importJson(com.google.gson.JsonElement element) {
         if (element == null) return false;
         try {
