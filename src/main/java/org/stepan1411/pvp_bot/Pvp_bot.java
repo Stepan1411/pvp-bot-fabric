@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.stepan1411.pvp_bot.bot.BotCombat;
 import org.stepan1411.pvp_bot.bot.BotKits;
-import org.stepan1411.pvp_bot.bot.BotPresets;
 import org.stepan1411.pvp_bot.bot.BotManager;
 import org.stepan1411.pvp_bot.bot.BotPath;
 import org.stepan1411.pvp_bot.bot.BotSettings;
@@ -103,7 +102,6 @@ public class Pvp_bot implements ModInitializer {
             StatsReporter.onServerStarted(server);
             WorldConfigHelper.init(server);
             BotKits.init(server);
-            BotPresets.init(server);
             BotPath.init();
             BotManager.init(server);
 

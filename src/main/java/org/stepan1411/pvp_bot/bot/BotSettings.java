@@ -124,28 +124,11 @@ public class BotSettings {
     
     public static void save() {
         if (INSTANCE == null || configPath == null) return;
-
+        
         try (Writer writer = Files.newBufferedWriter(configPath)) {
             GSON.toJson(INSTANCE, writer);
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-
-    public static com.google.gson.JsonElement exportJson() {
-        return GSON.toJsonTree(get());
-    }
-
-    public static boolean importJson(com.google.gson.JsonElement element) {
-        if (element == null) return false;
-        try {
-            BotSettings loaded = GSON.fromJson(element, BotSettings.class);
-            if (loaded == null) return false;
-            INSTANCE = loaded;
-            save();
-            return true;
-        } catch (Exception e) {
-            return false;
         }
     }
     
