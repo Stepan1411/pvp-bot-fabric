@@ -37,6 +37,9 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     
+    // Permissions API (LuckPerms support). Bundled via jar-in-jar.
+    include(modImplementation("me.lucko:fabric-permissions-api:0.6.1"))
+    
     // HeroBot - required dependency for bot spawning and movement
     // User must install HeroBot separately, we detect it at runtime
     // No compile-time dependency needed since we use reflection
