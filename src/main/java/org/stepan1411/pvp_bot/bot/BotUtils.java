@@ -22,6 +22,7 @@ public class BotUtils {
         public boolean isBlocking = false;
         public boolean isEating = false;
         public int eatingTicks = 0;
+        public int healRetreatTicks = 0;
         public int windChargeCooldown = 0;
         public int eatingSlot = -1;
         public int potionCooldown = 0;
@@ -368,6 +369,8 @@ public class BotUtils {
         boolean needHealth = health <= maxHealth * 0.5f;
         boolean criticalHealth = health <= maxHealth * 0.3f;
         
+        boolean hungerFull = hunger >= 20;
+        
 
         var combatState = BotCombat.getState(bot.getName().getString());
         boolean isRetreating = combatState.isRetreating;
@@ -382,18 +385,20 @@ public class BotUtils {
             
 
             ItemStack foodStack = bot.getMainHandStack();
-            if (foodStack.getItem().getComponents().get(DataComponentTypes.FOOD) != null) {
+            if (foodStack.getItem().getComponents().get(DataComponentTypes.FOOD) != null || foodStack.getItem() instanceof PotionItem) {
 
                 bot.setCurrentHand(Hand.MAIN_HAND);
             }
             
-
-            if (state.eatingTicks >= 80) {
+            boolean eatingFood = foodStack.getItem().getComponents().get(DataComponentTypes.FOOD) != null;
+            
+            if (state.eatingTicks >= 80 || (hunger >= 20 && eatingFood)) {
                 executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
                 state.isEating = false;
                 state.eatingTicks = 0;
                 state.eatingSlot = -1;
                 state.eatCooldown = 10;
+                state.healRetreatTicks = 0;
                 
 
                 hunger = bot.getHungerManager().getFoodLevel();
@@ -413,7 +418,31 @@ public class BotUtils {
 
         boolean shouldEatGoldenApple = needHealth && hasGoldenApple(bot.getInventory());
         
-        if ((shouldEat || shouldEatGoldenApple) && state.eatCooldown <= 0 && !state.isBlocking) {
+        boolean wantToEat = (shouldEat || shouldEatGoldenApple) && !hungerFull && state.eatCooldown <= 0 && !state.isBlocking && !state.isEating &&
+                            findBestFood(bot.getInventory(), needHealth || criticalHealth) >= 0;
+        
+        if (state.healRetreatTicks > 0) {
+            state.healRetreatTicks--;
+            var retreatTarget = combatState.target;
+            if (retreatTarget != null) {
+                BotNavigation.lookAway(bot, retreatTarget);
+                BotNavigation.moveAway(bot, retreatTarget, 1.5);
+            }
+            if (state.healRetreatTicks > 0) {
+                return;
+            }
+            state.healRetreatTicks = -1;
+            wantToEat = true;
+        } else if (wantToEat && settings.getHealRetreatSeconds() > 0 && state.healRetreatTicks == 0) {
+            state.healRetreatTicks = settings.getHealRetreatSeconds() * 20;
+            return;
+        }
+        
+        if (state.healRetreatTicks == -1 && !(shouldEat || shouldEatGoldenApple)) {
+            state.healRetreatTicks = 0;
+        }
+        
+        if (wantToEat) {
  
             if (combatState.isUsingShield) {
                 try {
@@ -562,6 +591,18 @@ public class BotUtils {
         if (state.isEating) {
             shouldBlock = false;
         }
+        
+        if (BotCombat.isEnemyHealing(target)) {
+            shouldBlock = false;
+            if (state.isBlocking) {
+                if (shouldUseMainHandShield(bot)) {
+                    stopMainHandBlocking(bot, state, server);
+                } else {
+                    stopBlocking(bot, state, server);
+                }
+                state.blockHoldTicks = 0;
+            }
+        }
 
         if (shouldBlock && !state.isBlocking) {
             if (shouldUseMainHandShield(bot)) {
@@ -589,6 +630,9 @@ public class BotUtils {
     }
     
     private static void startBlocking(ServerPlayerEntity bot, BotState state, int shieldSlot, MinecraftServer server) {
+        if (BotCombat.isShieldOnCooldown(bot)) {
+            return;
+        }
         var inventory = bot.getInventory();
         
         if (shieldSlot != 40) {
@@ -681,6 +725,9 @@ public class BotUtils {
     }
 
     private static void startMainHandBlocking(ServerPlayerEntity bot, BotState state, MinecraftServer server) {
+        if (BotCombat.isShieldOnCooldown(bot)) {
+            return;
+        }
         state.savedMainHandSlot = org.stepan1411.pvp_bot.utils.InventoryHelper.getSelectedSlot(bot.getInventory());
         equipShieldToMainHand(bot);
         executeCommand(server, bot, "player " + bot.getName().getString() + " use continuous");
@@ -833,6 +880,27 @@ public class BotUtils {
             return true;
         } else if (potionItem instanceof PotionItem) {
 
+            var combatState = BotCombat.getState(bot.getName().getString());
+            if (combatState.isUsingShield) {
+                try {
+                    server.getCommandManager().getDispatcher().execute(
+                        "player " + bot.getName().getString() + " stop",
+                        server.getCommandSource()
+                    );
+                } catch (Exception e) {}
+                combatState.isUsingShield = false;
+                combatState.shieldToggleCooldown = 20;
+            }
+            if (state.isBlocking) {
+                if (shouldUseMainHandShield(bot)) {
+                    stopMainHandBlocking(bot, state, server);
+                } else {
+                    stopBlocking(bot, state, server);
+                }
+            }
+
+            executeCommand(server, bot, "player " + bot.getName().getString() + " use continuous");
+
             state.isEating = true;
             state.eatingTicks = 0;
             state.eatingSlot = potionSlot;
@@ -842,6 +910,11 @@ public class BotUtils {
         }
         
         return false;
+    }
+    
+    
+    public static boolean hasHealingPotion(ServerPlayerEntity bot) {
+        return findHealingPotion(bot.getInventory()) >= 0;
     }
     
     

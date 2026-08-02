@@ -29,12 +29,13 @@ public class BotSettings {
     private boolean targetHostileMobs = false;
     private boolean targetOtherBots = false;
     private double maxTargetDistance = 64.0;
-    private double meleeRange = 3.5;
+    private double meleeRange = 3.0;
     private double rangedMinRange = 20.0;
     private double rangedOptimalRange = 40.0;
     private double rangedMaxRange = 60.0;
     private double maceRange = 6.0;
-    private int attackCooldown = 10;
+    private int attackCooldown = 8;
+    private int healRetreatSeconds = 3;
     private double moveSpeed = 1.0;
     private boolean criticalsEnabled = true;
     private int criticalFallTicks = 6;
@@ -170,6 +171,7 @@ public class BotSettings {
     public double getRangedMaxRange() { return rangedMaxRange; }
     public double getMaceRange() { return maceRange; }
     public int getAttackCooldown() { return attackCooldown; }
+    public int getHealRetreatSeconds() { return healRetreatSeconds; }
     public double getMoveSpeed() { return moveSpeed; }
     public boolean isCriticalsEnabled() { return criticalsEnabled; }
     public int getCriticalFallTicks() { return criticalFallTicks; }
@@ -284,6 +286,10 @@ public class BotSettings {
     }
     public void setAttackCooldown(int value) { 
         this.attackCooldown = Math.max(1, Math.min(40, value)); 
+        save(); 
+    }
+    public void setHealRetreatSeconds(int value) { 
+        this.healRetreatSeconds = Math.max(0, Math.min(10, value)); 
         save(); 
     }
     public void setMoveSpeed(double value) { 
