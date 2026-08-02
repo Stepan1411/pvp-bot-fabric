@@ -395,6 +395,7 @@ public class BotCommand {
         settings.then(boolSetting("shield-mace", "Auto-shield against mace", () -> BotSettings.get().isShieldMace(), v -> BotSettings.get().setShieldMace(v), BotSettings.DEFAULTS::isShieldMace));
         settings.then(intSetting("attack-cooldown", "Ticks between melee attacks", () -> BotSettings.get().getAttackCooldown(), v -> BotSettings.get().setAttackCooldown(v), 1, 40, BotSettings.DEFAULTS::getAttackCooldown));
         settings.then(intSetting("heal-retreat", "Seconds to retreat before healing", () -> BotSettings.get().getHealRetreatSeconds(), v -> BotSettings.get().setHealRetreatSeconds(v), 0, 10, BotSettings.DEFAULTS::getHealRetreatSeconds));
+        settings.then(boolSetting("attack-enemy-heal", "Attack healing enemy (heal only below 1 heart)", () -> BotSettings.get().isAttackWhileEnemyHeals(), v -> BotSettings.get().setAttackWhileEnemyHeals(v), BotSettings.DEFAULTS::isAttackWhileEnemyHeals));
         settings.then(doubleSetting("melee-range", "Melee attack range", () -> BotSettings.get().getMeleeRange(), v -> BotSettings.get().setMeleeRange(v), 2.0, 6.0, BotSettings.DEFAULTS::getMeleeRange));
         settings.then(doubleSetting("move-speed", "Movement speed multiplier", () -> BotSettings.get().getMoveSpeed(), v -> BotSettings.get().setMoveSpeed(v), 0.1, 2.0, BotSettings.DEFAULTS::getMoveSpeed));
         settings.then(boolSetting("auto-totem", "Auto-equip totem to offhand", () -> BotSettings.get().isAutoTotemEnabled(), v -> BotSettings.get().setAutoTotemEnabled(v), BotSettings.DEFAULTS::isAutoTotemEnabled));
@@ -646,6 +647,7 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("shield-mace: " + s.isShieldMace()), false);
         source.sendFeedback(() -> Text.literal("attack-cooldown: " + s.getAttackCooldown() + " ticks"), false);
         source.sendFeedback(() -> Text.literal("heal-retreat: " + s.getHealRetreatSeconds() + " seconds"), false);
+        source.sendFeedback(() -> Text.literal("attack-enemy-heal: " + s.isAttackWhileEnemyHeals() + " (heal only below 1 heart while enemy heals)"), false);
         source.sendFeedback(() -> Text.literal("melee-range: " + s.getMeleeRange()), false);
         source.sendFeedback(() -> Text.literal("move-speed: " + s.getMoveSpeed()), false);
         source.sendFeedback(() -> Text.literal("=== Utilities ==="), false);

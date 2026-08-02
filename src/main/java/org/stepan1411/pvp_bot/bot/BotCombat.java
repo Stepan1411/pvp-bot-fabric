@@ -292,6 +292,11 @@ public class BotCombat {
         boolean lowHealth = healthPercent <= settings.getRetreatHealthPercent();
         boolean criticalHealth = healthPercent <= settings.getCriticalHealthPercent();
         
+        boolean enemyHealing = isEnemyHealing(target);
+        boolean attackWhileEnemyHeals = settings.isAttackWhileEnemyHeals() && enemyHealing;
+        boolean healLowHealth = attackWhileEnemyHeals ? health <= 2.0f : lowHealth;
+        boolean healCriticalHealth = attackWhileEnemyHeals ? health <= 2.0f : criticalHealth;
+        
 
         boolean hasFood = BotUtils.hasFood(bot);
         
@@ -336,7 +341,7 @@ public class BotCombat {
         }
         
 
-        if (lowHealth && settings.isAutoPotionEnabled() && !utilsState.isEating) {
+        if (healLowHealth && settings.isAutoPotionEnabled() && !utilsState.isEating) {
             if (settings.getHealRetreatSeconds() > 0 && utilsState.healRetreatTicks == 0 && BotUtils.hasHealingPotion(bot)) {
                 utilsState.healRetreatTicks = settings.getHealRetreatSeconds() * 20;
                 return;
@@ -352,7 +357,7 @@ public class BotCombat {
 
 
         boolean shouldRetreat = settings.isRetreatEnabled() && hasFood && 
-                               (criticalHealth || (lowHealth && !state.shieldBroken));
+                               (healCriticalHealth || (healLowHealth && !state.shieldBroken));
         
 
 
@@ -881,7 +886,15 @@ public class BotCombat {
 
         var navState = BotNavigation.getState(bot.getName().getString());
 
-        if (distance > reach) {
+        boolean enemyHealing = isEnemyHealing(target);
+        boolean backOffEnemyHeal = enemyHealing && !settings.isAttackWhileEnemyHeals();
+
+        if (backOffEnemyHeal) {
+            if (distance < 3.0) {
+                BotNavigation.lookAway(bot, target);
+                BotNavigation.moveAway(bot, target, 1.2);
+            }
+        } else if (distance > reach) {
             BotNavigation.moveToward(bot, target, settings.getMoveSpeed());
         } else if (distance < 1.5) {
 
@@ -938,7 +951,7 @@ public class BotCombat {
             holdShield = false;
         }
         
-        if (isEnemyHealing(target)) {
+        if (enemyHealing) {
             holdShield = false;
         }
 
@@ -982,7 +995,36 @@ public class BotCombat {
             org.stepan1411.pvp_bot.bot.BotUtils.unequipShieldFromMainHand(bot);
         }
 
-        if (distance <= reach && state.attackCooldown <= 0) {
+        // === SHIELD BREAK while both block (chance every tick) ===
+        if (settings.isShieldBreakEnabled() && state.attackCooldown <= 0 && distance <= reach &&
+            target instanceof PlayerEntity blockPlayer && blockPlayer.isBlocking() && (state.isUsingShield || bot.isBlocking())) {
+            if (random.nextInt(100) < settings.getShieldBreakChance()) {
+                if (state.isUsingShield) {
+                    stopUsingShield(bot, server);
+                    state.isUsingShield = false;
+                }
+                state.shieldToggleCooldown = 10;
+                int axeSlot = findAxe(inventory);
+                if (axeSlot >= 0) {
+                    if (axeSlot >= 9) {
+                        ItemStack axe = inventory.getStack(axeSlot);
+                        ItemStack current = inventory.getStack(0);
+                        inventory.setStack(axeSlot, current);
+                        inventory.setStack(0, axe);
+                        axeSlot = 0;
+                    }
+                    org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(inventory, axeSlot);
+                    if (attackWithCarpet(bot, target, server)) {
+                        state.shieldBroken = true;
+                        state.shieldBrokenTime = System.currentTimeMillis();
+                    }
+                    state.attackCooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                    return;
+                }
+            }
+        }
+
+        if (distance <= reach && state.attackCooldown <= 0 && !backOffEnemyHeal) {
             if (bot.isBlocking() && state.shieldPredictTicks > 0 && distance < 2.0) {
                 return;
             }

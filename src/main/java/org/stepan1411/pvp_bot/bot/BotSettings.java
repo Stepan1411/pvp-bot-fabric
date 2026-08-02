@@ -36,6 +36,7 @@ public class BotSettings {
     private double maceRange = 6.0;
     private int attackCooldown = 8;
     private int healRetreatSeconds = 3;
+    private boolean attackWhileEnemyHeals = true;
     private double moveSpeed = 1.0;
     private boolean criticalsEnabled = true;
     private int criticalFallTicks = 6;
@@ -172,6 +173,7 @@ public class BotSettings {
     public double getMaceRange() { return maceRange; }
     public int getAttackCooldown() { return attackCooldown; }
     public int getHealRetreatSeconds() { return healRetreatSeconds; }
+    public boolean isAttackWhileEnemyHeals() { return attackWhileEnemyHeals; }
     public double getMoveSpeed() { return moveSpeed; }
     public boolean isCriticalsEnabled() { return criticalsEnabled; }
     public int getCriticalFallTicks() { return criticalFallTicks; }
@@ -292,6 +294,7 @@ public class BotSettings {
         this.healRetreatSeconds = Math.max(0, Math.min(10, value)); 
         save(); 
     }
+    public void setAttackWhileEnemyHeals(boolean value) { this.attackWhileEnemyHeals = value; save(); }
     public void setMoveSpeed(double value) { 
         this.moveSpeed = Math.max(0.1, Math.min(2.0, value)); 
         save(); 

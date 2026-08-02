@@ -360,20 +360,22 @@ public class BotUtils {
             }
             return;
         }
-        
         int hunger = bot.getHungerManager().getFoodLevel();
         float health = bot.getHealth();
         float maxHealth = bot.getMaxHealth();
         
+        var combatState = BotCombat.getState(bot.getName().getString());
+        boolean enemyHealing = combatState.target != null && BotCombat.isEnemyHealing(combatState.target);
+        boolean lowHealThreshold = settings.isAttackWhileEnemyHeals() && enemyHealing;
+        
         boolean needFood = hunger <= settings.getMinHungerToEat();
-        boolean needHealth = health <= maxHealth * 0.5f;
-        boolean criticalHealth = health <= maxHealth * 0.3f;
+        boolean needHealth = lowHealThreshold ? health <= 2.0f : health <= maxHealth * 0.5f;
+        boolean criticalHealth = lowHealThreshold ? health <= 2.0f : health <= maxHealth * 0.3f;
         
         boolean hungerFull = hunger >= 20;
         
 
-        var combatState = BotCombat.getState(bot.getName().getString());
-        boolean isRetreating = combatState.isRetreating;
+
         
         if (state.isEating) {
             state.eatingTicks++;
@@ -435,6 +437,11 @@ public class BotUtils {
             wantToEat = true;
         } else if (wantToEat && settings.getHealRetreatSeconds() > 0 && state.healRetreatTicks == 0) {
             state.healRetreatTicks = settings.getHealRetreatSeconds() * 20;
+            if (combatState.isUsingShield) {
+                executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
+                combatState.isUsingShield = false;
+                combatState.shieldToggleCooldown = 20;
+            }
             return;
         }
         
@@ -590,6 +597,18 @@ public class BotUtils {
 
         if (state.isEating) {
             shouldBlock = false;
+        }
+        
+        if (state.healRetreatTicks > 0) {
+            shouldBlock = false;
+            if (state.isBlocking) {
+                if (shouldUseMainHandShield(bot)) {
+                    stopMainHandBlocking(bot, state, server);
+                } else {
+                    stopBlocking(bot, state, server);
+                }
+                state.blockHoldTicks = 0;
+            }
         }
         
         if (BotCombat.isEnemyHealing(target)) {
