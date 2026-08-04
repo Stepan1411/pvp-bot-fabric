@@ -68,24 +68,27 @@ public class BotUtils {
         if (state.mendingCooldown > 0) state.mendingCooldown--;
         
 
-        if (settings.isAutoMendEnabled()) {
-            boolean needsMending = handleAutoMend(bot, state, settings, server);
-            if (needsMending) {
-                return;
-            }
-        }
-        
-
         if (state.isThrowingPotion) {
+            if (state.isBlocking) {
+                executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
+                state.isBlocking = false;
+            }
+            if (state.isEating) {
+                executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
+                state.isEating = false;
+                state.eatingTicks = 0;
+                state.eatingSlot = -1;
+            }
+
             state.throwingPotionTicks++;
 
             bot.setPitch(90);
-            
-            if (state.throwingPotionTicks == 2) {
+
+            if (state.throwingPotionTicks == 1) {
 
                 executeCommand(server, bot, "player " + bot.getName().getString() + " use once");
             }
-            if (state.throwingPotionTicks >= 5) {
+            if (state.throwingPotionTicks >= 2) {
 
                 if (!state.potionsToThrow.isEmpty()) {
                     int nextSlot = state.potionsToThrow.remove(0);
@@ -109,6 +112,14 @@ public class BotUtils {
                 }
             }
             return;
+        }
+        
+
+        if (settings.isAutoMendEnabled()) {
+            boolean needsMending = handleAutoMend(bot, state, settings, server);
+            if (needsMending) {
+                return;
+            }
         }
         
 
@@ -177,15 +188,60 @@ public class BotUtils {
         
         var inventory = bot.getInventory();
         ItemStack offhand = inventory.getStack(40);
-        
-        if (offhand.getItem() == Items.TOTEM_OF_UNDYING) return;
-        
-        for (int i = 0; i < 36; i++) {
-            ItemStack stack = inventory.getStack(i);
-            if (stack.getItem() == Items.TOTEM_OF_UNDYING) {
-                inventory.setStack(i, offhand.copy());
-                inventory.setStack(40, stack.copy());
-                return;
+        boolean preferTotem = BotSettings.get().isPreferTotem();
+        boolean lowHealth = bot.getHealth() < 6.0f;
+
+        if (preferTotem) {
+            if (offhand.getItem() == Items.TOTEM_OF_UNDYING) return;
+
+            for (int i = 0; i < 36; i++) {
+                ItemStack stack = inventory.getStack(i);
+                if (stack.getItem() == Items.TOTEM_OF_UNDYING) {
+                    inventory.setStack(i, offhand.copy());
+                    inventory.setStack(40, stack.copy());
+                    return;
+                }
+            }
+            return;
+        }
+
+        if (offhand.getItem() == Items.TOTEM_OF_UNDYING) {
+            if (!lowHealth) {
+                int shieldSlot = findShield(inventory);
+                if (shieldSlot >= 0) {
+                    ItemStack shield = inventory.getStack(shieldSlot);
+                    inventory.setStack(shieldSlot, offhand.copy());
+                    inventory.setStack(40, shield);
+                } else {
+                    for (int i = 0; i < 36; i++) {
+                        if (inventory.getStack(i).isEmpty()) {
+                            inventory.setStack(i, offhand.copy());
+                            inventory.setStack(40, ItemStack.EMPTY);
+                            return;
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        if (offhand.getItem() != Items.SHIELD && !lowHealth) {
+            int shieldSlot = findShield(inventory);
+            if (shieldSlot >= 0) {
+                ItemStack shield = inventory.getStack(shieldSlot);
+                inventory.setStack(shieldSlot, offhand.copy());
+                inventory.setStack(40, shield);
+            }
+        }
+
+        if (lowHealth) {
+            for (int i = 0; i < 36; i++) {
+                ItemStack stack = inventory.getStack(i);
+                if (stack.getItem() == Items.TOTEM_OF_UNDYING) {
+                    inventory.setStack(i, offhand.copy());
+                    inventory.setStack(40, stack.copy());
+                    return;
+                }
             }
         }
     }
@@ -561,6 +617,17 @@ public class BotUtils {
             return;
         }
 
+        if (BotSettings.get().isPreferTotem() && hasTotemInInventory(bot)) {
+            if (state.isBlocking) {
+                if (shouldUseMainHandShield(bot)) {
+                    stopMainHandBlocking(bot, state, server);
+                } else {
+                    stopBlocking(bot, state, server);
+                }
+            }
+            return;
+        }
+
         var target = combatState.target;
 
         if (target == null) {
@@ -710,8 +777,17 @@ public class BotUtils {
     }
 
     public static boolean shouldUseMainHandShield(ServerPlayerEntity bot) {
-        if (!BotSettings.get().isTotemPriority()) return false;
-        return bot.getInventory().getStack(40).getItem() == Items.TOTEM_OF_UNDYING;
+        if (!BotSettings.get().isPreferTotem()) return false;
+        return hasTotemInInventory(bot);
+    }
+
+    public static boolean hasTotemInInventory(ServerPlayerEntity bot) {
+        var inventory = bot.getInventory();
+        if (inventory.getStack(40).getItem() == Items.TOTEM_OF_UNDYING) return true;
+        for (int i = 0; i < 36; i++) {
+            if (inventory.getStack(i).getItem() == Items.TOTEM_OF_UNDYING) return true;
+        }
+        return false;
     }
 
     private static final int SHIELD_HOTBAR_SLOT = 1;
@@ -1125,16 +1201,11 @@ public class BotUtils {
             net.minecraft.util.math.Vec3d botPos = new net.minecraft.util.math.Vec3d(bot.getX(), bot.getY(), bot.getZ());
             double distToWater = botPos.distanceTo(net.minecraft.util.math.Vec3d.ofCenter(state.waterPosition));
             
-            System.out.println("[COBWEB] Returning for water. Distance: " + distToWater + ", Position: " + state.waterPosition);
-            
             if (distToWater < 1.5) {
                 net.minecraft.block.BlockState blockStateAtWater = bot.getEntityWorld().getBlockState(state.waterPosition);
                 net.minecraft.block.Block blockAtWater = blockStateAtWater.getBlock();
                 
-                System.out.println("[COBWEB] Close to water! Block: " + blockAtWater + ", isWater: " + blockStateAtWater.isOf(net.minecraft.block.Blocks.WATER));
-                
                 if (blockStateAtWater.isOf(net.minecraft.block.Blocks.WATER)) {
-                    System.out.println("[COBWEB] Collecting water at saved position...");
                     
                     if (state.cobwebEscapeSlot >= 0 && state.cobwebEscapeSlot < 9) {
                         org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(bot.getInventory(), state.cobwebEscapeSlot);
@@ -1146,10 +1217,8 @@ public class BotUtils {
                     state.needsToCollectWater = false;
                     state.waterPosition = null;
                     state.cobwebEscapeSlot = -1;
-                    System.out.println("[COBWEB] Water collected successfully!");
                     return;
                 } else {
-                    System.out.println("[COBWEB] Water not found at position, cancelling...");
                     state.needsToCollectWater = false;
                     state.waterPosition = null;
                     return;
@@ -1179,23 +1248,19 @@ public class BotUtils {
                 net.minecraft.util.math.BlockPos waterPos = bot.getBlockPos().down();
                 state.waterPosition = waterPos;
                 
-                System.out.println("[COBWEB] Tick 5 - Collecting water at position: " + waterPos);
                 executeCommand(server, bot, "player " + bot.getName().getString() + " use once");
                 
 
                 ItemStack currentItem = bot.getInventory().getStack(state.cobwebEscapeSlot);
                 if (currentItem.getItem() != Items.WATER_BUCKET) {
-                    System.out.println("[COBWEB] Water not collected, will return later. Current item: " + currentItem.getItem());
                     state.needsToCollectWater = true;
                 } else {
-                    System.out.println("[COBWEB] Water collected successfully!");
                     state.needsToCollectWater = false;
                     state.waterPosition = null;
                 }
             }
             
             if (state.cobwebEscapeTicks >= 10) {
-                System.out.println("[COBWEB] Tick 10 - Finishing escape process...");
                 executeCommand(server, bot, "player " + bot.getName().getString() + " stop");
                 state.isEscapingCobweb = false;
                 state.cobwebEscapeTicks = 0;
@@ -1219,7 +1284,6 @@ public class BotUtils {
         int pearlSlot = findEnderPearl(bot.getInventory());
         
         if (waterSlot < 0 && pearlSlot < 0) {
-            System.out.println("[COBWEB] No water bucket or ender pearl found! Bot can attack normally.");
             return;
         }
         
@@ -1233,8 +1297,6 @@ public class BotUtils {
                 bot.getInventory().setStack(8, water);
                 waterSlot = 8;
             }
-            
-            System.out.println("[COBWEB] Starting escape process - placing water...");
             
             state.cobwebEscapeSlot = waterSlot;
             state.isEscapingCobweb = true;
@@ -1251,7 +1313,6 @@ public class BotUtils {
             bot.setPitch(90.0f);
             
 
-            System.out.println("[COBWEB] Placing water at position: " + state.waterPosition);
             executeCommand(server, bot, "player " + bot.getName().getString() + " use once");
         } else if (pearlSlot >= 0) {
 
@@ -1262,8 +1323,6 @@ public class BotUtils {
                 bot.getInventory().setStack(8, pearl);
                 pearlSlot = 8;
             }
-            
-            System.out.println("[COBWEB] Using ender pearl to escape...");
             
 
             org.stepan1411.pvp_bot.utils.InventoryHelper.setSelectedSlot(bot.getInventory(), pearlSlot);
@@ -1312,10 +1371,8 @@ public class BotUtils {
             int pearlSlot = findEnderPearl(bot.getInventory());
             
             if (waterSlot < 0 && pearlSlot < 0) {
-                System.out.println("[COBWEB] " + bot.getName().getString() + " in cobweb but no water/pearl - can attack");
                 return true;
             }
-            System.out.println("[COBWEB] " + bot.getName().getString() + " in cobweb with escape items - cannot attack");
             return false;
         }
         

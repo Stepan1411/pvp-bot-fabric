@@ -13,7 +13,6 @@ import org.stepan1411.pvp_bot.config.WorldConfigHelper;
 import org.stepan1411.pvp_bot.fixes.ProfileLagFix;
 
 
-import org.stepan1411.pvp_bot.stats.StatsReporter;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
@@ -370,7 +369,6 @@ public class BotManager {
                 botDataMap.put(name, new BotData(newBot));
                 saveBots();
                 System.out.println("[PVP_BOT] Added bot to list (immediate): " + name);
-                StatsReporter.sendSpawn(name);
 
             }
             return true;
@@ -379,7 +377,6 @@ public class BotManager {
 
         if (!bots.contains(name)) {
             bots.add(name);
-            StatsReporter.sendSpawn(name);
 
             BotData defaultData = new BotData();
             defaultData.name = name;
@@ -403,7 +400,6 @@ public class BotManager {
         boolean wasInList = bots.remove(name);
         botDataMap.remove(name);
         saveBots();
-        if (wasInList) StatsReporter.sendKill();
         
 
         BotCombat.removeState(name);
@@ -434,7 +430,6 @@ public class BotManager {
 
     public static void removeAllBots(MinecraftServer server, ServerCommandSource source) {
         var dispatcher = server.getCommandManager().getDispatcher();
-        int count = bots.size();
         boolean clear = BotSettings.get().isClearOnRemove();
         for (String name : new HashSet<>(bots)) {
 
@@ -458,7 +453,6 @@ public class BotManager {
         bots.clear();
         botDataMap.clear();
         saveBots();
-        for (int i = 0; i < count; i++) StatsReporter.sendKill();
         
 
     }
@@ -495,7 +489,6 @@ public class BotManager {
                     BotNavigation.resetIdle(name);
                     nullTickCount.remove(name);
                     changed = true;
-                    StatsReporter.sendKill();
                     System.out.println("[PVP_BOT] Removed dead bot (entity gone): " + name);
                 }
                 continue;
@@ -509,7 +502,6 @@ public class BotManager {
                 BotCombat.removeState(name);
                 BotUtils.removeState(name);
                 BotNavigation.resetIdle(name);
-                StatsReporter.sendKill();
 
 
                 try {

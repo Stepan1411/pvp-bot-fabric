@@ -4,7 +4,6 @@
   "package": "org.stepan1411.pvp_bot.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "DamageTrackingMixin",
     "ServerPlayerEntityMixin",
     "ServerConfigHandlerMixin"
   ],

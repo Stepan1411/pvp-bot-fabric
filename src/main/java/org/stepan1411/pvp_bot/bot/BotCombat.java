@@ -365,7 +365,7 @@ public class BotCombat {
             state.isRetreating = true;
             
 
-            if (settings.isAutoShieldEnabled()) {
+            if (settings.isAutoShieldEnabled() && !(org.stepan1411.pvp_bot.bot.BotSettings.get().isPreferTotem() && org.stepan1411.pvp_bot.bot.BotUtils.hasTotemInInventory(bot))) {
                 var inventory = bot.getInventory();
 
                 if (isEnemyHealing(target) && state.isUsingShield) {
@@ -741,6 +741,21 @@ public class BotCombat {
             ItemStack mainHand = player.getMainHandStack();
             boolean hasMace = mainHand.getItem() == Items.MACE;
 
+            // Check entire inventory: covers the attribute-swap trick
+            // (sword in hand, mace swapped 1 tick before the hit)
+            if (!hasMace) {
+                var inventory = player.getInventory();
+                for (int i = 0; i < 36; i++) {
+                    if (inventory.getStack(i).getItem() == Items.MACE) {
+                        hasMace = true;
+                        break;
+                    }
+                }
+                if (!hasMace && inventory.getStack(40).getItem() == Items.MACE) {
+                    hasMace = true;
+                }
+            }
+
             if (!hasMace) return false;
 
             // Check if target is not on ground (in air)
@@ -952,6 +967,10 @@ public class BotCombat {
         }
         
         if (enemyHealing) {
+            holdShield = false;
+        }
+
+        if (org.stepan1411.pvp_bot.bot.BotSettings.get().isPreferTotem() && org.stepan1411.pvp_bot.bot.BotUtils.hasTotemInInventory(bot)) {
             holdShield = false;
         }
 

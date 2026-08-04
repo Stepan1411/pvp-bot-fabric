@@ -49,7 +49,7 @@ public class BotSettings {
     private double spearRange = 4.5;
     private double spearChargeRange = 12.0;
     private boolean autoTotemEnabled = true;
-    private boolean totemPriority = true;
+    private boolean preferTotem = true;
     private boolean autoEatEnabled = true;
     private boolean autoShieldEnabled = true;
     private boolean autoMendEnabled = true;
@@ -187,7 +187,7 @@ public class BotSettings {
     public double getSpearChargeRange() { return spearChargeRange; }
     
     public boolean isAutoTotemEnabled() { return autoTotemEnabled; }
-    public boolean isTotemPriority() { return totemPriority; }
+    public boolean isPreferTotem() { return preferTotem; }
     public boolean isAutoEatEnabled() { return autoEatEnabled; }
     public boolean isAutoShieldEnabled() { return autoShieldEnabled; }
     public boolean isAutoMendEnabled() { return autoMendEnabled; }
@@ -323,7 +323,7 @@ public class BotSettings {
     }
     
     public void setAutoTotemEnabled(boolean value) { this.autoTotemEnabled = value; save(); }
-    public void setTotemPriority(boolean value) { this.totemPriority = value; save(); }
+    public void setPreferTotem(boolean value) { this.preferTotem = value; save(); }
     public void setAutoEatEnabled(boolean value) { this.autoEatEnabled = value; save(); }
     public void setAutoShieldEnabled(boolean value) { this.autoShieldEnabled = value; save(); }
     public void setAutoMendEnabled(boolean value) { this.autoMendEnabled = value; save(); }

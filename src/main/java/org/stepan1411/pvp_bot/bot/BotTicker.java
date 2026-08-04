@@ -4,17 +4,14 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.Vec3d;
-import org.stepan1411.pvp_bot.stats.StatsReporter;
 
 public class BotTicker {
 
     private static int tickCounter = 0;
     private static int autoSaveCounter = 0;
     private static int heroBotCommandCounter = 0;
-    private static int statsReportCounter = 0;
     private static final int AUTO_SAVE_INTERVAL = 1200;
     private static final int HERO_BOT_COMMAND_INTERVAL = 20;
-    private static final int STATS_REPORT_INTERVAL = 100;
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(BotTicker::onServerTick);
@@ -56,12 +53,13 @@ public class BotTicker {
                 }
 
                 boolean isFollowingWithoutAttack = BotPath.isFollowing(botName) && !BotPath.shouldAttack(botName);
-                if (!isFollowingWithoutAttack) {
+                boolean isThrowingPotion = BotUtils.getState(botName).isThrowingPotion;
+                if (!isFollowingWithoutAttack && !isThrowingPotion) {
                     BotCombat.update(bot, server);
                 }
                 
 
-                if (BotPath.isFollowing(botName)) {
+                if (BotPath.isFollowing(botName) && !isThrowingPotion) {
                     boolean shouldAttack = BotPath.shouldAttack(botName);
                     var target = BotCombat.getTarget(botName);
                     boolean hasTarget = target != null && target.isAlive();
@@ -123,7 +121,7 @@ public class BotTicker {
 
                 if (tickCounter >= interval) {
                     var utilsState = BotUtils.getState(botName);
-                    if (!utilsState.isEating && !BotCombat.isElytraMaceActive(botName) && !BotCombat.isWindBurstActive(botName)) {
+                    if (!utilsState.isEating && !utilsState.isThrowingPotion && !BotCombat.isElytraMaceActive(botName) && !BotCombat.isWindBurstActive(botName)) {
                         BotEquipment.autoEquip(bot);
                     }
                 }
@@ -132,12 +130,6 @@ public class BotTicker {
         
         if (tickCounter >= interval) {
             tickCounter = 0;
-        }
-
-        statsReportCounter++;
-        if (statsReportCounter >= STATS_REPORT_INTERVAL) {
-            statsReportCounter = 0;
-            StatsReporter.sendHeartbeat();
         }
 
         heroBotCommandCounter++;

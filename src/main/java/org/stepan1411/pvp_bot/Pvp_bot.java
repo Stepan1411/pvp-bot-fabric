@@ -22,7 +22,6 @@ import org.stepan1411.pvp_bot.network.BotPayloads;
 import org.stepan1411.pvp_bot.network.BotSettingsReader;
 import org.stepan1411.pvp_bot.network.BotSettingsUpdater;
 import org.stepan1411.pvp_bot.network.SettingsPayloads;
-import org.stepan1411.pvp_bot.stats.StatsReporter;
 
 
 import java.util.ArrayList;
@@ -36,7 +35,6 @@ public class Pvp_bot implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Initializing PvP Bot");
 
-        StatsReporter.init();
         registerPayloads();
         registerCommands();
         registerServerEvents();
@@ -100,7 +98,6 @@ public class Pvp_bot implements ModInitializer {
 
     private void registerServerEvents() {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            StatsReporter.onServerStarted(server);
             WorldConfigHelper.init(server);
             BotKits.init(server);
             BotPresets.init(server);

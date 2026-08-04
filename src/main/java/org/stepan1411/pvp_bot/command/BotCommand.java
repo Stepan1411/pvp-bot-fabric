@@ -428,7 +428,7 @@ public class BotCommand {
         settings.then(doubleSetting("melee-range", "Melee attack range", () -> BotSettings.get().getMeleeRange(), v -> BotSettings.get().setMeleeRange(v), 2.0, 6.0, BotSettings.DEFAULTS::getMeleeRange, "settings.melee-range"));
         settings.then(doubleSetting("move-speed", "Movement speed multiplier", () -> BotSettings.get().getMoveSpeed(), v -> BotSettings.get().setMoveSpeed(v), 0.1, 2.0, BotSettings.DEFAULTS::getMoveSpeed, "settings.move-speed"));
         settings.then(boolSetting("auto-totem", "Auto-equip totem to offhand", () -> BotSettings.get().isAutoTotemEnabled(), v -> BotSettings.get().setAutoTotemEnabled(v), BotSettings.DEFAULTS::isAutoTotemEnabled, "settings.auto-totem"));
-        settings.then(boolSetting("totem-priority", "Keep totem over shield in offhand", () -> BotSettings.get().isTotemPriority(), v -> BotSettings.get().setTotemPriority(v), BotSettings.DEFAULTS::isTotemPriority, "settings.totem-priority"));
+        settings.then(boolSetting("prefer-totem", "Prefer totem: no shield if totem exists, mace-smash only shield in right hand", () -> BotSettings.get().isPreferTotem(), v -> BotSettings.get().setPreferTotem(v), BotSettings.DEFAULTS::isPreferTotem, "settings.prefer-totem"));
         settings.then(boolSetting("auto-shield", "Auto-use shield", () -> BotSettings.get().isAutoShieldEnabled(), v -> BotSettings.get().setAutoShieldEnabled(v), BotSettings.DEFAULTS::isAutoShieldEnabled, "settings.auto-shield"));
         settings.then(boolSetting("auto-potion", "Auto-use potions", () -> BotSettings.get().isAutoPotionEnabled(), v -> BotSettings.get().setAutoPotionEnabled(v), BotSettings.DEFAULTS::isAutoPotionEnabled, "settings.auto-potion"));
         settings.then(boolSetting("shield-break", "Auto-axe enemy shield", () -> BotSettings.get().isShieldBreakEnabled(), v -> BotSettings.get().setShieldBreakEnabled(v), BotSettings.DEFAULTS::isShieldBreakEnabled, "settings.shield-break"));
@@ -684,7 +684,7 @@ public class BotCommand {
         source.sendFeedback(() -> Text.literal("move-speed: " + s.getMoveSpeed()), false);
         source.sendFeedback(() -> Text.literal("=== Utilities ==="), false);
         source.sendFeedback(() -> Text.literal("auto-totem: " + s.isAutoTotemEnabled()), false);
-        source.sendFeedback(() -> Text.literal("totem-priority: " + s.isTotemPriority() + " (don't replace totem with shield)"), false);
+        source.sendFeedback(() -> Text.literal("prefer-totem: " + s.isPreferTotem() + " (on: no shield while totem held, mace-smash -> shield in right hand; off: shield in left hand, totem when <3 hearts / mace-smash)"), false);
         source.sendFeedback(() -> Text.literal("auto-shield: " + s.isAutoShieldEnabled()), false);
         source.sendFeedback(() -> Text.literal("auto-potion: " + s.isAutoPotionEnabled()), false);
         source.sendFeedback(() -> Text.literal("shield-break: " + s.isShieldBreakEnabled()), false);
