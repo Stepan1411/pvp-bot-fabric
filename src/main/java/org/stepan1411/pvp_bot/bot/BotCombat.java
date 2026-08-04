@@ -1043,19 +1043,26 @@ public class BotCombat {
             }
         }
 
-        if (distance <= reach && state.attackCooldown <= 0 && !backOffEnemyHeal) {
+        if (distance <= reach && !backOffEnemyHeal) {
             if (bot.isBlocking() && state.shieldPredictTicks > 0 && distance < 2.0) {
                 return;
             }
 
-            if (bot.getAttackCooldownProgress(0.5f) < 0.75f) {
-                if (settings.isCriticalsEnabled() && bot.isOnGround() && bot.getAttackCooldownProgress(0.5f) < 0.5f) {
-                    bot.jump();
-                    state.critFallTicks = 0;
-                }
+            float attackProgress = bot.getAttackCooldownProgress(0.5f);
+            boolean falling = !bot.isOnGround() && bot.getVelocity().y < 0;
+
+            // Pre-jump so the fall window lands right when the cooldown is > 90%.
+            // Vanilla crits require cooldown progress > 90% and !isSprinting.
+            if (settings.isCriticalsEnabled() && bot.isOnGround()
+                    && state.attackCooldown <= 5 && attackProgress >= 0.3f) {
+                bot.jump();
+                state.critFallTicks = 2;
                 return;
             }
-            
+
+            if (state.attackCooldown > 0) {
+                return;
+            }
 
             // === SHIELD BREAK (every 2 ticks while enemy blocks) ===
             if (settings.isShieldBreakEnabled() && target instanceof PlayerEntity player && player.isBlocking()) {
@@ -1084,8 +1091,23 @@ public class BotCombat {
             } else {
                 state.shieldHitTicks = 0;
             }
-            
 
+            // Crit-spam: in the air, never attack with a normal hit - wait for the
+            // falling window at full cooldown. On the ground the pre-jump handles it.
+            if (settings.isCriticalsEnabled()) {
+                if (!falling) {
+                    return;
+                }
+                state.critFallTicks = Math.max(state.critFallTicks, 1);
+                if (attackProgress <= 0.9f) {
+                    return;
+                }
+                state.critFallTicks = 0;
+            } else if (attackProgress < 0.75f) {
+                return;
+            }
+            
+            
             if (!shieldInMainHand) {
                 int currentSlot = org.stepan1411.pvp_bot.utils.InventoryHelper.getSelectedSlot(inventory);
                 ItemStack currentItem = inventory.getStack(currentSlot);
@@ -1104,15 +1126,18 @@ public class BotCombat {
             }
             
 
-            if (settings.isCriticalsEnabled() && !bot.isOnGround() && bot.getVelocity().y < 0 && state.critFallTicks > 0) {
+            if (settings.isCriticalsEnabled() && falling) {
                 state.critFallTicks++;
-                if (state.critFallTicks >= Math.min(settings.getCriticalFallTicks(), 3) || bot.getAttackCooldownProgress(0.5f) >= 0.75f) {
-                    bot.fallDistance = 1.0f;
-                    attack(bot, target);
+                if (bot.getAttackCooldownProgress(0.5f) <= 0.9f) {
                     state.critFallTicks = 0;
-                    int cooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
-                    state.attackCooldown = cooldown;
+                    return;
                 }
+                bot.setSprinting(false);
+                bot.fallDistance = 1.0f;
+                attack(bot, target);
+                state.critFallTicks = 0;
+                int cooldown = lowHealth ? (int)(settings.getAttackCooldown() * 1.5) : settings.getAttackCooldown();
+                state.attackCooldown = cooldown;
             } else {
                 attackWithCarpet(bot, target, server);
                 state.critFallTicks = 0;
